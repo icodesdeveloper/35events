@@ -21,7 +21,7 @@ export default async function PaymentsPage({
     expected,
     received: totalReceived,
     balance,
-    paymentStatus: registration.paymentStatus,
+    paymentStatus: registration.paymentStatus as PaymentRow["paymentStatus"],
     createdAt: registration.createdAt,
   }));
 

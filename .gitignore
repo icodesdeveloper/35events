@@ -20,6 +20,10 @@
 # local uploads (see lib/storage/local.ts)
 /storage/
 
+# local sqlite db (temporary local-only substitute for the real MySQL target — see prisma/schema.prisma)
+/prisma/dev.db
+/prisma/dev.db-journal
+
 # production
 /build
 

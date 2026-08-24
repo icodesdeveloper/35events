@@ -17,7 +17,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
 
   const items: QuestionItem[] = questions.map((q) => ({
     id: q.id,
-    type: q.type,
+    type: q.type as QuestionItem["type"],
     label: q.label,
     required: q.required,
     options: Array.isArray(q.options) ? (q.options as string[]) : null,

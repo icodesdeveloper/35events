@@ -5,8 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
 import { updatePaymentStatus, deleteRegistration } from "@/app/admin/(dashboard)/events/[id]/registrations/actions";
 import ConfirmSubmitButton from "@/components/admin/ConfirmSubmitButton";
-import { getExpectedAmount, getPaymentBalance, PAYMENT_BALANCE_LABEL } from "@/lib/payments";
-import type { PaymentStatus } from "@prisma/client";
+import { getExpectedAmount, getPaymentBalance, PAYMENT_BALANCE_LABEL, type PaymentStatus } from "@/lib/payments";
 
 const STATUS_OPTIONS: { value: PaymentStatus; label: string }[] = [
   { value: "PENDING_PAYMENT", label: "In afwachting" },

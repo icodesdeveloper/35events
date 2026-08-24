@@ -4,8 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSort, faSortUp, faSortDown } from "@fortawesome/free-solid-svg-icons";
-import type { PaymentStatus } from "@prisma/client";
-import { PAYMENT_BALANCE_LABEL, type PaymentBalanceStatus } from "@/lib/payments";
+import { PAYMENT_BALANCE_LABEL, type PaymentBalanceStatus, type PaymentStatus } from "@/lib/payments";
 
 export type PaymentRow = {
   registrationId: string;

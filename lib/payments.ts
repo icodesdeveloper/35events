@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
+export type PaymentStatus = "PENDING_PAYMENT" | "CONFIRMED" | "CANCELLED";
+
 // Excludes visually-ambiguous characters (0/O, 1/I/L) so a code is easy to
 // read back off a bank transfer confirmation or receipt.
 const REFERENCE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";

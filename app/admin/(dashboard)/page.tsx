@@ -46,7 +46,7 @@ async function getRecentRegistrations(): Promise<RecentRegistrationRow[]> {
     vehicle: `${registration.vehicleMake} ${registration.vehicleModel}`,
     eventId: registration.event.id,
     eventName: registration.event.name,
-    status: registration.paymentStatus,
+    status: registration.paymentStatus as RecentRegistrationRow["status"],
   }));
 }
 

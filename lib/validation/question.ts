@@ -7,6 +7,8 @@ export const questionFormSchema = z.object({
   options: z.string().optional(),
 });
 
+export type QuestionType = z.infer<typeof questionFormSchema>["type"];
+
 export function parseOptions(raw: string | undefined): string[] {
   if (!raw) return [];
   return raw

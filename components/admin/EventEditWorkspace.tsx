@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Reorder } from "framer-motion";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGripVertical, faFont, faEnvelope, faHashtag, faListUl, faTrash, faPlus } from "@fortawesome/free-solid-svg-icons";
-import type { QuestionType } from "@prisma/client";
+import type { QuestionType } from "@/lib/validation/question";
 import EventFormFields, { fieldClass, labelClass, type EventFormData } from "@/components/forms/EventFormFields";
 import DatePickerField from "@/components/admin/DatePickerField";
 import SelectField from "@/components/admin/SelectField";

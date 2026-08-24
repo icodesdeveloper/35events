@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { storage } from "@/lib/storage";
-import type { PaymentStatus } from "@prisma/client";
+import type { PaymentStatus } from "@/lib/payments";
 
 export async function updatePaymentStatus(eventId: string, registrationId: string, status: PaymentStatus) {
   await prisma.registration.update({ where: { id: registrationId }, data: { paymentStatus: status } });

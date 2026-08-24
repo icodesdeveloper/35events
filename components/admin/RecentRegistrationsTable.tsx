@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSort, faSortUp, faSortDown } from "@fortawesome/free-solid-svg-icons";
-import type { PaymentStatus } from "@prisma/client";
+import type { PaymentStatus } from "@/lib/payments";
 
 export type RecentRegistrationRow = {
   id: string;

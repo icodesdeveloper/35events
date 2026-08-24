@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth as participantAuth } from "@/lib/auth/participant";
-import ExtraInfoForm from "@/components/forms/ExtraInfoForm";
+import ExtraInfoForm, { type ExtraInfoQuestionField } from "@/components/forms/ExtraInfoForm";
 import { getExtraInfoAvailability, EXTRA_INFO_CLOSED_MESSAGE } from "@/lib/questionForms";
 
 export default async function ExtraInfoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -60,7 +60,7 @@ export default async function ExtraInfoPage({ params }: { params: Promise<{ id: 
         registrationId={registration.id}
         questions={form.questions.map((question) => ({
           id: question.id,
-          type: question.type,
+          type: question.type as ExtraInfoQuestionField["type"],
           label: question.label,
           required: question.required,
           options: Array.isArray(question.options) ? (question.options as string[]) : null,

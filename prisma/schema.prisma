@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -44,13 +44,13 @@ model Event {
   id               String    @id @default(cuid())
   slug             String    @unique
   name             String
-  description      String    @db.Text
+  description      String
   date             DateTime
   endDate          DateTime?
   distanceKm       Float?
   durationMinutes  Int?
-  price            Decimal?  @db.Decimal(8, 2)
-  passengerPrice   Decimal?  @db.Decimal(8, 2)
+  price            Decimal?
+  passengerPrice   Decimal?
   coverImagePath   String?
   published        Boolean   @default(false)
   registrationOpen Boolean   @default(false)
@@ -64,40 +64,33 @@ model Event {
   @@index([date])
 }
 
-enum QuestionType {
-  TEXT
-  EMAIL
-  NUMBER
-  SELECT
-}
-
 // One optional extra-info form per event — created lazily by the admin UI,
 // editable freely while draft; publishing notifies current registrants (see
 // lib/notifications/extraInfo.ts).
 model EventQuestionForm {
-  id          String    @id @default(cuid())
-  eventId     String    @unique
-  published   Boolean   @default(false)
-  publishedAt DateTime?
-  deadline    DateTime?
+  id            String    @id @default(cuid())
+  eventId       String    @unique
+  published     Boolean   @default(false)
+  publishedAt   DateTime?
+  deadline      DateTime?
   // Manual admin override, independent of the deadline — lets the admin
   // close submissions early or reopen them without touching the deadline.
-  responsesOpen Boolean @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  responsesOpen Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   event     Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
   questions EventQuestion[]
 }
 
 model EventQuestion {
-  id       String       @id @default(cuid())
+  id       String  @id @default(cuid())
   formId   String
-  type     QuestionType
+  type     String // QuestionType: TEXT | EMAIL | NUMBER | SELECT — see lib/validation/question.ts
   label    String
-  required Boolean      @default(false)
+  required Boolean @default(false)
   options  Json? // string[] — only used for SELECT
-  order    Int          @default(0)
+  order    Int     @default(0)
 
   form    EventQuestionForm     @relation(fields: [formId], references: [id], onDelete: Cascade)
   answers EventQuestionAnswer[]
@@ -109,7 +102,7 @@ model EventQuestionAnswer {
   id             String   @id @default(cuid())
   questionId     String
   registrationId String
-  value          String   @db.Text
+  value          String
   updatedAt      DateTime @updatedAt
 
   question     EventQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
@@ -118,54 +111,43 @@ model EventQuestionAnswer {
   @@unique([questionId, registrationId])
 }
 
-enum EventMediaType {
-  PHOTO
-  VIDEO
-}
-
 model EventMedia {
-  id        String         @id @default(cuid())
+  id        String   @id @default(cuid())
   eventId   String
-  type      EventMediaType
+  type      String // EventMediaType: PHOTO | VIDEO
   filePath  String
   caption   String?
-  order     Int            @default(0)
-  createdAt DateTime       @default(now())
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId, order])
 }
 
-enum PaymentStatus {
-  PENDING_PAYMENT
-  CONFIRMED
-  CANCELLED
-}
-
 model Registration {
-  id                      String        @id @default(cuid())
+  id                      String    @id @default(cuid())
   eventId                 String
   participantId           String
   vehicleMake             String
   vehicleModel            String
   vehicleType             String?
   vehiclePhotoPath        String
-  hasPassenger            Boolean       @default(false)
-  priceSnapshot           Decimal?      @db.Decimal(8, 2)
-  passengerPriceSnapshot  Decimal?      @db.Decimal(8, 2)
-  paymentStatus           PaymentStatus @default(PENDING_PAYMENT)
+  hasPassenger            Boolean   @default(false)
+  priceSnapshot           Decimal?
+  passengerPriceSnapshot  Decimal?
+  paymentStatus           String    @default("PENDING_PAYMENT") // PaymentStatus: PENDING_PAYMENT | CONFIRMED | CANCELLED — see lib/payments.ts
   // Short code the participant puts in the bank transfer description so an
   // incoming payment can be matched back to this registration — see
   // lib/payments.ts and app/admin/(dashboard)/payments/actions.ts.
-  paymentReference        String?       @unique
+  paymentReference        String?   @unique
   // Set when the extra-info "please fill this in" mail goes out (on publish)
   // and cleared/reset on every republish so a new reminder cycle can run
   // against the new deadline.
   extraInfoNotifiedAt     DateTime?
   extraInfoReminderSentAt DateTime?
-  createdAt               DateTime      @default(now())
-  updatedAt               DateTime      @updatedAt
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   event       Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
   participant Participant           @relation(fields: [participantId], references: [id], onDelete: Cascade)
@@ -183,7 +165,7 @@ model Registration {
 model Payment {
   id             String   @id @default(cuid())
   registrationId String
-  amount         Decimal  @db.Decimal(8, 2)
+  amount         Decimal
   receivedAt     DateTime @default(now())
 
   registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)

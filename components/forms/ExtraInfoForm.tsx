@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import type { QuestionType } from "@prisma/client";
+import type { QuestionType } from "@/lib/validation/question";
 import {
   submitExtraInfoAnswers,
   type ExtraInfoState,

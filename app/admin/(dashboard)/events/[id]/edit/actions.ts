@@ -3,10 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { parseEventFormData } from "@/lib/validation/event";
-import { questionFormSchema, parseOptions } from "@/lib/validation/question";
+import { questionFormSchema, parseOptions, type QuestionType } from "@/lib/validation/question";
 import { saveUploadedFile, storage } from "@/lib/storage";
 import { notifyRegistrantsOfPublish } from "@/lib/notifications/extraInfo";
-import type { QuestionType } from "@prisma/client";
 
 export type QuestionItem = {
   id: string;
@@ -182,7 +181,7 @@ export async function saveEventEdit(
   return {
     questions: freshQuestions.map((q) => ({
       id: q.id,
-      type: q.type,
+      type: q.type as QuestionType,
       label: q.label,
       required: q.required,
       options: Array.isArray(q.options) ? (q.options as string[]) : null,
