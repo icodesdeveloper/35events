@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model AdminAllowlist {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  label     String?
+  createdAt DateTime @default(now())
+}
+
+model Participant {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  username        String    @unique
+  passwordHash    String?
+  emailVerifiedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  magicLinkTokens ParticipantMagicLinkToken[]
+  registrations   Registration[]
+}
+
+model ParticipantMagicLinkToken {
+  id            String    @id @default(cuid())
+  participantId String
+  tokenHash     String    @unique
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@index([participantId])
+}
+
+model Event {
+  id               String    @id @default(cuid())
+  slug             String    @unique
+  name             String
+  description      String    @db.Text
+  date             DateTime
+  endDate          DateTime?
+  distanceKm       Float?
+  durationMinutes  Int?
+  price            Decimal?  @db.Decimal(8, 2)
+  passengerPrice   Decimal?  @db.Decimal(8, 2)
+  coverImagePath   String?
+  published        Boolean   @default(false)
+  registrationOpen Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  media         EventMedia[]
+  registrations Registration[]
+  questionForm  EventQuestionForm?
+
+  @@index([date])
+}
+
+enum QuestionType {
+  TEXT
+  EMAIL
+  NUMBER
+  SELECT
+}
+
+// One optional extra-info form per event — created lazily by the admin UI,
+// editable freely while draft; publishing notifies current registrants (see
+// lib/notifications/extraInfo.ts).
+model EventQuestionForm {
+  id          String    @id @default(cuid())
+  eventId     String    @unique
+  published   Boolean   @default(false)
+  publishedAt DateTime?
+  deadline    DateTime?
+  // Manual admin override, independent of the deadline — lets the admin
+  // close submissions early or reopen them without touching the deadline.
+  responsesOpen Boolean @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  event     Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  questions EventQuestion[]
+}
+
+model EventQuestion {
+  id       String       @id @default(cuid())
+  formId   String
+  type     QuestionType
+  label    String
+  required Boolean      @default(false)
+  options  Json? // string[] — only used for SELECT
+  order    Int          @default(0)
+
+  form    EventQuestionForm     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  answers EventQuestionAnswer[]
+
+  @@index([formId, order])
+}
+
+model EventQuestionAnswer {
+  id             String   @id @default(cuid())
+  questionId     String
+  registrationId String
+  value          String   @db.Text
+  updatedAt      DateTime @updatedAt
+
+  question     EventQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  registration Registration  @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, registrationId])
+}
+
+enum EventMediaType {
+  PHOTO
+  VIDEO
+}
+
+model EventMedia {
+  id        String         @id @default(cuid())
+  eventId   String
+  type      EventMediaType
+  filePath  String
+  caption   String?
+  order     Int            @default(0)
+  createdAt DateTime       @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, order])
+}
+
+enum PaymentStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  CANCELLED
+}
+
+model Registration {
+  id                      String        @id @default(cuid())
+  eventId                 String
+  participantId           String
+  vehicleMake             String
+  vehicleModel            String
+  vehicleType             String?
+  vehiclePhotoPath        String
+  hasPassenger            Boolean       @default(false)
+  priceSnapshot           Decimal?      @db.Decimal(8, 2)
+  passengerPriceSnapshot  Decimal?      @db.Decimal(8, 2)
+  paymentStatus           PaymentStatus @default(PENDING_PAYMENT)
+  // Short code the participant puts in the bank transfer description so an
+  // incoming payment can be matched back to this registration — see
+  // lib/payments.ts and app/admin/(dashboard)/payments/actions.ts.
+  paymentReference        String?       @unique
+  // Set when the extra-info "please fill this in" mail goes out (on publish)
+  // and cleared/reset on every republish so a new reminder cycle can run
+  // against the new deadline.
+  extraInfoNotifiedAt     DateTime?
+  extraInfoReminderSentAt DateTime?
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  event       Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  participant Participant           @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  answers     EventQuestionAnswer[]
+  payments    Payment[]
+
+  @@unique([eventId, participantId])
+  @@index([eventId])
+  @@index([participantId])
+}
+
+// One row per bank transfer matched to a registration via paymentReference —
+// not a single "amount received" field, since a participant may pay in
+// installments or send too much/too little (see lib/payments.ts).
+model Payment {
+  id             String   @id @default(cuid())
+  registrationId String
+  amount         Decimal  @db.Decimal(8, 2)
+  receivedAt     DateTime @default(now())
+
+  registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+
+  @@index([registrationId])
+}

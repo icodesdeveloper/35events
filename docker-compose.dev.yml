@@ -1,0 +1,16 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: events35
+      MYSQL_USER: events35
+      MYSQL_PASSWORD: events35
+      MYSQL_ROOT_PASSWORD: events35_root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+
+volumes:
+  mysql_dev_data:
