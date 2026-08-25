@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleCheck } from "@fortawesome/free-solid-svg-icons";
 import { getEventBySlug } from "@/lib/events";
 import { formatDistance, formatDuration, formatEventDate, formatPrice } from "@/lib/format";
+import { getEffectivePrice, getActiveEarlybirdTier } from "@/lib/pricing";
 import MediaGallery from "@/components/public/MediaGallery";
 import CornerBrackets from "@/components/public/CornerBrackets";
 import { auth as participantAuth } from "@/lib/auth/participant";
@@ -31,10 +32,12 @@ export default async function EventDetailPage({
       })
     : null;
 
+  const hasPrice = event.price != null || event.earlybirdPrices.length > 0;
+  const activeEarlybirdTier = getActiveEarlybirdTier(event);
   const stats = [
     event.distanceKm ? formatDistance(event.distanceKm) : null,
     event.durationMinutes ? formatDuration(event.durationMinutes) : null,
-    event.price != null ? `${formatPrice(event.price.toString())} deelname` : null,
+    hasPrice ? `${formatPrice(getEffectivePrice(event))} deelname` : null,
     event.passengerPrice != null ? `${formatPrice(event.passengerPrice.toString())} passagier` : null,
   ].filter((stat): stat is string => stat !== null);
 
@@ -67,6 +70,12 @@ export default async function EventDetailPage({
             </span>
           ))}
         </div>
+
+        {activeEarlybirdTier ? (
+          <p className="font-mono-label text-accent mt-2 text-xs">
+            Vroegboekprijs geldig tot {formatEventDate(activeEarlybirdTier.deadline)}
+          </p>
+        ) : null}
 
         {registration ? (
           <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border border-emerald-400/30 px-5 py-4 text-sm text-emerald-300">

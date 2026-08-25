@@ -2,11 +2,12 @@ import { prisma } from "@/lib/prisma";
 import type { PaymentStatus } from "@/lib/payments";
 
 export type CampaignStatus = "DRAFT" | "SCHEDULED" | "SENT";
-export type AudienceMode = "ALL_PARTICIPANTS" | "EVENTS";
+export type AudienceMode = "ALL_PARTICIPANTS" | "EVENTS" | "SPECIFIC_PARTICIPANTS";
 
 export type AudienceFilter =
   | { mode: "ALL_PARTICIPANTS" }
-  | { mode: "EVENTS"; eventIds: string[]; statuses: PaymentStatus[] };
+  | { mode: "EVENTS"; eventIds: string[]; statuses: PaymentStatus[] }
+  | { mode: "SPECIFIC_PARTICIPANTS"; participantIds: string[] };
 
 export type CampaignRecipient = { id: string; username: string; email: string };
 
@@ -17,6 +18,15 @@ export async function resolveAudience(filter: AudienceFilter): Promise<CampaignR
   if (filter.mode === "ALL_PARTICIPANTS") {
     return prisma.participant.findMany({
       where: { disabledAt: null },
+      select: { id: true, username: true, email: true },
+      orderBy: { username: "asc" },
+    });
+  }
+
+  if (filter.mode === "SPECIFIC_PARTICIPANTS") {
+    if (filter.participantIds.length === 0) return [];
+    return prisma.participant.findMany({
+      where: { id: { in: filter.participantIds }, disabledAt: null },
       select: { id: true, username: true, email: true },
       orderBy: { username: "asc" },
     });
@@ -42,12 +52,19 @@ export function parseAudienceFilter(campaign: {
   audienceMode: string;
   eventIds: unknown;
   statuses: unknown;
+  participantIds: unknown;
 }): AudienceFilter {
   if (campaign.audienceMode === "EVENTS") {
     return {
       mode: "EVENTS",
       eventIds: Array.isArray(campaign.eventIds) ? (campaign.eventIds as string[]) : [],
       statuses: Array.isArray(campaign.statuses) ? (campaign.statuses as PaymentStatus[]) : [],
+    };
+  }
+  if (campaign.audienceMode === "SPECIFIC_PARTICIPANTS") {
+    return {
+      mode: "SPECIFIC_PARTICIPANTS",
+      participantIds: Array.isArray(campaign.participantIds) ? (campaign.participantIds as string[]) : [],
     };
   }
   return { mode: "ALL_PARTICIPANTS" };

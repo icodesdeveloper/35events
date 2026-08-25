@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState, useRef, useState, useTransition, type MouseEvent } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition, type MouseEvent } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronDown, faChevronUp, faFileLines } from "@fortawesome/free-solid-svg-icons";
 import RichTextEditor, { type RichTextEditorHandle } from "@/components/admin/RichTextEditor";
 import DatePickerField from "@/components/admin/DatePickerField";
 import Checkbox from "@/components/admin/Checkbox";
+import MultiCombobox from "@/components/admin/MultiCombobox";
 import { useConfirm } from "@/components/admin/ConfirmDialogProvider";
 import { formatEventDate } from "@/lib/format";
 import { CAMPAIGN_TEMPLATES } from "@/lib/mail/campaignTemplates";
@@ -15,7 +16,7 @@ import {
   previewAudience,
   type CampaignFormState,
 } from "@/app/admin/(dashboard)/communications/actions";
-import type { CampaignRecipient } from "@/lib/campaigns";
+import type { AudienceMode, CampaignRecipient } from "@/lib/campaigns";
 
 const fieldClass =
   "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-slate-400 focus:border-zinc-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-white disabled:opacity-60";
@@ -34,9 +35,10 @@ export type CampaignData = {
   subject: string;
   bodyHtml: string;
   status: "DRAFT" | "SCHEDULED" | "SENT";
-  audienceMode: "ALL_PARTICIPANTS" | "EVENTS";
+  audienceMode: AudienceMode;
   eventIds: string[];
   statuses: string[];
+  participantIds: string[];
   scheduledAt: string | null;
   sentAt: string | null;
   sentCount: number | null;
@@ -53,9 +55,11 @@ const dateTimeFormatter = new Intl.DateTimeFormat("nl-BE", {
 export default function CommunicationComposer({
   campaign,
   events,
+  participants,
 }: {
   campaign: CampaignData | null;
   events: { id: string; name: string; date: Date }[];
+  participants: { id: string; username: string; email: string }[];
 }) {
   const confirm = useConfirm();
   const boundAction = saveCampaign.bind(null, campaign?.id ?? null);
@@ -63,11 +67,12 @@ export default function CommunicationComposer({
   const errors = state.fieldErrors ?? {};
 
   const readOnly = campaign?.status === "SENT";
-  const [audienceMode, setAudienceMode] = useState<"ALL_PARTICIPANTS" | "EVENTS">(campaign?.audienceMode ?? "ALL_PARTICIPANTS");
+  const [audienceMode, setAudienceMode] = useState<AudienceMode>(campaign?.audienceMode ?? "ALL_PARTICIPANTS");
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>(campaign?.eventIds ?? []);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(
     campaign?.statuses ?? STATUS_OPTIONS.map((s) => s.value),
   );
+  const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>(campaign?.participantIds ?? []);
   const [subject, setSubject] = useState(campaign?.subject ?? "");
   const [scheduledDate, setScheduledDate] = useState(campaign?.scheduledAt?.slice(0, 10) ?? "");
   const [scheduledTime, setScheduledTime] = useState(
@@ -82,20 +87,22 @@ export default function CommunicationComposer({
 
   const richTextRef = useRef<RichTextEditorHandle>(null);
 
+  // Live doelgroep-overzicht: elke wijziging aan de doelgroep-selectie
+  // herberekent automatisch het aantal/de lijst ontvangers, ook meteen bij
+  // het openen van de pagina — geen aparte "ververs"-knop meer nodig.
+  useEffect(() => {
+    startPreviewTransition(async () => {
+      const result = await previewAudience(audienceMode, selectedEventIds, selectedStatuses, selectedParticipantIds);
+      setRecipients(result);
+    });
+  }, [audienceMode, selectedEventIds, selectedStatuses, selectedParticipantIds]);
+
   function toggleEvent(eventId: string, checked: boolean) {
     setSelectedEventIds((prev) => (checked ? [...prev, eventId] : prev.filter((id) => id !== eventId)));
   }
 
   function toggleStatus(status: string, checked: boolean) {
     setSelectedStatuses((prev) => (checked ? [...prev, status] : prev.filter((s) => s !== status)));
-  }
-
-  function refreshPreview() {
-    startPreviewTransition(async () => {
-      const result = await previewAudience(audienceMode, selectedEventIds, selectedStatuses);
-      setRecipients(result);
-      setPreviewOpen(true);
-    });
   }
 
   function applyTemplate(templateId: string) {
@@ -109,10 +116,10 @@ export default function CommunicationComposer({
   async function handleSendClick(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
     const button = event.currentTarget;
-    const result = await previewAudience(audienceMode, selectedEventIds, selectedStatuses);
+    const count = recipients?.length ?? 0;
     const confirmed = await confirm({
       title: "Communicatie versturen",
-      message: `Dit verstuurt de mail nu naar ${result.length} ${result.length === 1 ? "ontvanger" : "ontvangers"}. Dit kan niet ongedaan gemaakt worden.`,
+      message: `Dit verstuurt de mail nu naar ${count} ${count === 1 ? "ontvanger" : "ontvangers"}. Dit kan niet ongedaan gemaakt worden.`,
       confirmLabel: "Verzenden",
       danger: true,
     });
@@ -126,11 +133,11 @@ export default function CommunicationComposer({
       await confirm({ title: "Ontbrekende datum", message: "Kies eerst een datum en tijdstip." });
       return;
     }
-    const result = await previewAudience(audienceMode, selectedEventIds, selectedStatuses);
+    const count = recipients?.length ?? 0;
     const moment = dateTimeFormatter.format(new Date(`${scheduledDate}T${scheduledTime}`));
     const confirmed = await confirm({
       title: "Communicatie plannen",
-      message: `Dit plant de mail in voor verzending op ${moment}, naar ${result.length} ${result.length === 1 ? "ontvanger" : "ontvangers"}. Dit kan niet ongedaan gemaakt worden.`,
+      message: `Dit plant de mail in voor verzending op ${moment}, naar ${count} ${count === 1 ? "ontvanger" : "ontvangers"}. Dit kan niet ongedaan gemaakt worden.`,
       confirmLabel: "Plannen",
       danger: true,
     });
@@ -145,6 +152,7 @@ export default function CommunicationComposer({
   }
 
   const busy = pending || unschedulePending;
+  const participantOptions = participants.map((p) => ({ value: p.id, label: `${p.username} (${p.email})` }));
 
   return (
     <form action={formAction} className="max-w-3xl space-y-8">
@@ -280,25 +288,44 @@ export default function CommunicationComposer({
               </div>
             </div>
           ) : null}
+
+          <label className="flex items-center gap-2.5 text-sm text-zinc-700 dark:text-slate-300">
+            <input
+              type="radio"
+              name="audienceMode"
+              value="SPECIFIC_PARTICIPANTS"
+              checked={audienceMode === "SPECIFIC_PARTICIPANTS"}
+              onChange={() => setAudienceMode("SPECIFIC_PARTICIPANTS")}
+              disabled={readOnly}
+            />
+            Specifieke gebruikers
+          </label>
+
+          {audienceMode === "SPECIFIC_PARTICIPANTS" ? (
+            <div className="ml-6 border-l border-slate-200 pl-4 dark:border-zinc-800">
+              <MultiCombobox
+                name="participantIds"
+                values={selectedParticipantIds}
+                onChange={setSelectedParticipantIds}
+                options={participantOptions}
+                placeholder="Zoek gebruikers op naam of e-mail..."
+                disabled={readOnly}
+              />
+            </div>
+          ) : null}
         </div>
 
         <div className="mt-4">
-          <button
-            type="button"
-            onClick={refreshPreview}
-            disabled={previewPending}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-slate-50 disabled:opacity-60 dark:border-zinc-700 dark:text-slate-300 dark:hover:bg-zinc-800"
-          >
-            {previewPending ? "Bezig..." : "Overzicht bijwerken"}
-          </button>
-          {recipients !== null ? (
-            <div className="mt-3 rounded-lg border border-slate-200 dark:border-zinc-800">
+          {recipients === null ? (
+            <p className="text-sm text-slate-500 dark:text-slate-400">Overzicht laden...</p>
+          ) : (
+            <div className="rounded-lg border border-slate-200 dark:border-zinc-800">
               <button
                 type="button"
                 onClick={() => setPreviewOpen((v) => !v)}
                 className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-medium text-zinc-900 dark:text-white"
               >
-                {recipients.length} {recipients.length === 1 ? "ontvanger" : "ontvangers"}
+                {previewPending ? "Bijwerken..." : `${recipients.length} ${recipients.length === 1 ? "ontvanger" : "ontvangers"}`}
                 <FontAwesomeIcon icon={previewOpen ? faChevronUp : faChevronDown} className="h-3 w-3 text-slate-400" />
               </button>
               {previewOpen ? (
@@ -317,7 +344,7 @@ export default function CommunicationComposer({
                 </div>
               ) : null}
             </div>
-          ) : null}
+          )}
         </div>
       </section>
 

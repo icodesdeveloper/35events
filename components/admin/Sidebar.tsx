@@ -10,6 +10,7 @@ import {
   faUserGroup,
   faTags,
   faPaperPlane,
+  faUserShield,
   faArrowRightFromBracket,
 } from "@fortawesome/free-solid-svg-icons";
 import { adminSignOut } from "@/lib/auth/actions";
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { href: "/admin/participants", label: "Gebruikers", icon: faUserGroup, exact: false },
   { href: "/admin/discount-codes", label: "Kortingscodes", icon: faTags, exact: false },
   { href: "/admin/communications", label: "Communicatie", icon: faPaperPlane, exact: false },
+  { href: "/admin/admins", label: "Admins", icon: faUserShield, exact: false },
 ];
 
 export default function Sidebar({ open }: { open: boolean }) {

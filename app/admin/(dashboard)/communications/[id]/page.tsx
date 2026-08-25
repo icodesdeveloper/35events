@@ -4,9 +4,10 @@ import CommunicationComposer, { type CampaignData } from "@/components/admin/Com
 
 export default async function EditCommunicationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [campaign, events] = await Promise.all([
+  const [campaign, events, participants] = await Promise.all([
     prisma.campaign.findUnique({ where: { id } }),
     prisma.event.findMany({ select: { id: true, name: true, date: true }, orderBy: { date: "desc" } }),
+    prisma.participant.findMany({ select: { id: true, username: true, email: true }, orderBy: { username: "asc" } }),
   ]);
   if (!campaign) notFound();
 
@@ -18,10 +19,11 @@ export default async function EditCommunicationPage({ params }: { params: Promis
     audienceMode: campaign.audienceMode as CampaignData["audienceMode"],
     eventIds: Array.isArray(campaign.eventIds) ? (campaign.eventIds as string[]) : [],
     statuses: Array.isArray(campaign.statuses) ? (campaign.statuses as string[]) : [],
+    participantIds: Array.isArray(campaign.participantIds) ? (campaign.participantIds as string[]) : [],
     scheduledAt: campaign.scheduledAt ? campaign.scheduledAt.toISOString() : null,
     sentAt: campaign.sentAt ? campaign.sentAt.toISOString() : null,
     sentCount: campaign.sentCount,
   };
 
-  return <CommunicationComposer campaign={data} events={events} />;
+  return <CommunicationComposer campaign={data} events={events} participants={participants} />;
 }

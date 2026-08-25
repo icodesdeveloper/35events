@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import EventEditWorkspace from "@/components/admin/EventEditWorkspace";
 import { ensureQuestionForm } from "@/app/admin/(dashboard)/events/[id]/questions/actions";
-import type { QuestionItem } from "@/app/admin/(dashboard)/events/[id]/edit/actions";
+import type { QuestionItem, EarlybirdPriceItem } from "@/app/admin/(dashboard)/events/[id]/edit/actions";
 
 export default async function EditEventPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -10,10 +10,10 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
   if (!event) notFound();
 
   const form = await ensureQuestionForm(id);
-  const questions = await prisma.eventQuestion.findMany({
-    where: { formId: form.id },
-    orderBy: { order: "asc" },
-  });
+  const [questions, earlybirdPrices] = await Promise.all([
+    prisma.eventQuestion.findMany({ where: { formId: form.id }, orderBy: { order: "asc" } }),
+    prisma.earlybirdPrice.findMany({ where: { eventId: id }, orderBy: { deadline: "asc" } }),
+  ]);
 
   const items: QuestionItem[] = questions.map((q) => ({
     id: q.id,
@@ -23,6 +23,12 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
     perPassenger: q.perPassenger,
     options: Array.isArray(q.options) ? (q.options as string[]) : null,
     order: q.order,
+  }));
+
+  const earlybirdItems: EarlybirdPriceItem[] = earlybirdPrices.map((t) => ({
+    id: t.id,
+    deadline: t.deadline.toISOString().slice(0, 10),
+    price: t.price.toString(),
   }));
 
   return (
@@ -38,6 +44,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
       initialDeadline={form.deadline ? form.deadline.toISOString().slice(0, 10) : null}
       initialPublished={form.published}
       initialResponsesOpen={form.responsesOpen}
+      initialEarlybirdPrices={earlybirdItems}
     />
   );
 }

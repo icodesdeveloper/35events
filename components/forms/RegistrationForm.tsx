@@ -28,7 +28,7 @@ export default function RegistrationForm({
   const errors = state.fieldErrors ?? {};
 
   const [passengerCount, setPassengerCount] = useState(0);
-  const allowPassengers = maxPassengers > 0 && Boolean(passengerPrice);
+  const allowPassengers = maxPassengers > 0;
 
   const total = (price ? Number(price) : 0) + (allowPassengers ? passengerCount * Number(passengerPrice ?? 0) : 0);
   const expandedQuestions = expandQuestionsForPassengers(questions, allowPassengers ? passengerCount : 0);
@@ -76,7 +76,8 @@ export default function RegistrationForm({
       {allowPassengers ? (
         <div>
           <label className={labelClass} htmlFor="passengerCount">
-            Aantal passagiers (max. {maxPassengers}, +{formatPrice(passengerPrice ?? 0)} per passagier)
+            Aantal passagiers (max. {maxPassengers}
+            {passengerPrice ? `, +${formatPrice(passengerPrice)} per passagier` : ""})
           </label>
           <input
             id="passengerCount"
@@ -107,7 +108,7 @@ export default function RegistrationForm({
         ) : null}
       </div>
 
-      {price ? (
+      {price || (allowPassengers && passengerPrice) ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Deelnameprijs: <span className="font-medium text-zinc-900 dark:text-white">{formatPrice(total)}</span> —
           betaling volgt nog, we nemen contact op met de details.

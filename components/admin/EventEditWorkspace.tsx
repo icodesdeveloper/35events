@@ -13,7 +13,12 @@ import SelectField from "@/components/admin/SelectField";
 import Checkbox from "@/components/admin/Checkbox";
 import Switch from "@/components/admin/Switch";
 import { useConfirm } from "@/components/admin/ConfirmDialogProvider";
-import { saveEventEdit, type EventEditState, type QuestionItem } from "@/app/admin/(dashboard)/events/[id]/edit/actions";
+import {
+  saveEventEdit,
+  type EventEditState,
+  type QuestionItem,
+  type EarlybirdPriceItem,
+} from "@/app/admin/(dashboard)/events/[id]/edit/actions";
 import { unpublishQuestionForm } from "@/app/admin/(dashboard)/events/[id]/questions/actions";
 
 type DraftQuestion = {
@@ -25,6 +30,12 @@ type DraftQuestion = {
   perPassenger: boolean;
   options: string;
 };
+
+type DraftEarlybirdPrice = { clientKey: string; id?: string; deadline: string; price: string };
+
+function toEarlybirdDraft(e: EarlybirdPriceItem): DraftEarlybirdPrice {
+  return { clientKey: e.id, id: e.id, deadline: e.deadline, price: e.price };
+}
 
 const TYPE_ICON: Record<QuestionType, typeof faFont> = {
   TEXT: faFont,
@@ -53,6 +64,7 @@ export default function EventEditWorkspace({
   initialDeadline,
   initialPublished,
   initialResponsesOpen,
+  initialEarlybirdPrices,
 }: {
   eventId: string;
   formId: string;
@@ -61,6 +73,7 @@ export default function EventEditWorkspace({
   initialDeadline: string | null;
   initialPublished: boolean;
   initialResponsesOpen: boolean;
+  initialEarlybirdPrices: EarlybirdPriceItem[];
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -70,22 +83,27 @@ export default function EventEditWorkspace({
   const [questions, setQuestions] = useState<DraftQuestion[]>(() => initialQuestions.map(toDraft));
   const [published, setPublished] = useState(initialPublished);
   const [responsesOpen, setResponsesOpen] = useState(initialResponsesOpen);
+  const [earlybirdPrices, setEarlybirdPrices] = useState<DraftEarlybirdPrice[]>(() =>
+    initialEarlybirdPrices.map(toEarlybirdDraft),
+  );
   const [lastSyncedSavedAt, setLastSyncedSavedAt] = useState<number | undefined>(undefined);
   const [unpublishPending, startUnpublishTransition] = useTransition();
 
   // Resync local state with the server's response after a successful save —
   // React's documented "adjust state during render" pattern, not an effect —
-  // crucial so newly-created questions pick up their real DB id (otherwise a
-  // second save would re-create them instead of updating).
+  // crucial so newly-created questions/tiers pick up their real DB id
+  // (otherwise a second save would re-create them instead of updating).
   if (state.savedAt !== undefined && state.savedAt !== lastSyncedSavedAt) {
     setLastSyncedSavedAt(state.savedAt);
     if (state.questions) setQuestions(state.questions.map(toDraft));
     if (state.published !== undefined) setPublished(state.published);
     if (state.responsesOpen !== undefined) setResponsesOpen(state.responsesOpen);
+    if (state.earlybirdPrices) setEarlybirdPrices(state.earlybirdPrices.map(toEarlybirdDraft));
   }
 
   const fieldErrors = state.fieldErrors ?? {};
   const questionErrors = state.questionErrors ?? {};
+  const earlybirdErrors = state.earlybirdErrors ?? {};
 
   function updateQuestion(clientKey: string, patch: Partial<DraftQuestion>) {
     setQuestions((prev) => prev.map((q) => (q.clientKey === clientKey ? { ...q, ...patch } : q)));
@@ -102,6 +120,18 @@ export default function EventEditWorkspace({
     ]);
   }
 
+  function updateEarlybirdRow(clientKey: string, patch: Partial<DraftEarlybirdPrice>) {
+    setEarlybirdPrices((prev) => prev.map((e) => (e.clientKey === clientKey ? { ...e, ...patch } : e)));
+  }
+
+  function removeEarlybirdRow(clientKey: string) {
+    setEarlybirdPrices((prev) => prev.filter((e) => e.clientKey !== clientKey));
+  }
+
+  function addEarlybirdRow() {
+    setEarlybirdPrices((prev) => [...prev, { clientKey: crypto.randomUUID(), deadline: "", price: "" }]);
+  }
+
   async function handleUnpublish() {
     const confirmed = await confirm({
       message:
@@ -116,6 +146,9 @@ export default function EventEditWorkspace({
   }
 
   const busy = pending || unpublishPending;
+  const earlybirdPricesJson = JSON.stringify(
+    earlybirdPrices.map(({ clientKey, id, deadline, price }) => ({ clientKey, id, deadline, price })),
+  );
   const questionsJson = JSON.stringify(
     questions.map(({ clientKey, id, type, label, required, perPassenger, options }) => ({
       clientKey,
@@ -183,6 +216,69 @@ export default function EventEditWorkspace({
 
       <EventFormFields event={event} errors={fieldErrors} />
 
+      <section className="mt-10 max-w-2xl">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Earlybird pricing</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Geldt de eerstvolgende nog niet verstreken deadline hieronder niet meer (of zijn er geen), dan geldt de
+            gewone deelnameprijs hierboven.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          {earlybirdPrices.map((tier) => (
+            <div key={tier.clientKey}>
+              <div className="flex items-end gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900">
+                <div className="flex-1">
+                  <label className={labelClass}>Deadline</label>
+                  <DatePickerField
+                    defaultValue={tier.deadline}
+                    onChange={(value) => updateEarlybirdRow(tier.clientKey, { deadline: value })}
+                  />
+                </div>
+                <div className="w-32">
+                  <label className={labelClass}>Prijs (&euro;)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={tier.price}
+                    onChange={(e) => updateEarlybirdRow(tier.clientKey, { price: e.target.value })}
+                    className={fieldClass}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeEarlybirdRow(tier.clientKey)}
+                  aria-label="Verwijderen"
+                  className="shrink-0 rounded p-2.5 text-slate-400 transition-colors hover:text-red-600 dark:hover:text-red-400"
+                >
+                  <FontAwesomeIcon icon={faTrash} className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {earlybirdErrors[tier.clientKey] ? (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{earlybirdErrors[tier.clientKey]}</p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+
+        {earlybirdPrices.length === 0 ? (
+          <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">Nog geen earlybird-prijzen.</p>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={addEarlybirdRow}
+          className="mt-3 inline-flex items-center gap-2 rounded-lg border border-dashed border-slate-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-slate-50 dark:border-zinc-700 dark:text-slate-300 dark:hover:bg-zinc-800"
+        >
+          <FontAwesomeIcon icon={faPlus} className="h-3.5 w-3.5" />
+          Earlybird-prijs toevoegen
+        </button>
+
+        <input type="hidden" name="earlybirdPricesJson" value={earlybirdPricesJson} readOnly />
+      </section>
+
       <section id="vragen" className="mt-10 max-w-2xl">
         <div className="mb-4 flex items-center justify-between">
           <div>
@@ -244,7 +340,7 @@ export default function EventEditWorkspace({
                     />
                     <SelectField
                       value={q.type}
-                      onChange={(e) => updateQuestion(q.clientKey, { type: e.target.value as QuestionType })}
+                      onChange={(value) => updateQuestion(q.clientKey, { type: value as QuestionType })}
                     >
                       <option value="TEXT">Tekst</option>
                       <option value="EMAIL">E-mail</option>

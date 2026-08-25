@@ -9,6 +9,7 @@ import { generateUniquePaymentReference, getExpectedAmount } from "@/lib/payment
 import { validateDiscountCode, computeDiscountAmount, DISCOUNT_VALIDATION_MESSAGE } from "@/lib/discounts";
 import { collectQuestionAnswers, type PassengerQuestion } from "@/lib/questionForms";
 import type { QuestionType } from "@/lib/validation/question";
+import { getEffectivePrice } from "@/lib/pricing";
 
 const MAX_VEHICLE_PHOTO_BYTES = 1_000_000;
 import { sendMail } from "@/lib/mail/transporter";
@@ -38,7 +39,10 @@ export async function submitRegistration(
 
   const event = await prisma.event.findUnique({
     where: { slug },
-    include: { questionForm: { include: { questions: { orderBy: { order: "asc" } } } } },
+    include: {
+      questionForm: { include: { questions: { orderBy: { order: "asc" } } } },
+      earlybirdPrices: true,
+    },
   });
   if (!event || !event.published || !event.registrationOpen) {
     return { error: "Registratie is niet (meer) open voor dit event." };
@@ -96,7 +100,7 @@ export async function submitRegistration(
   );
   if (Object.keys(answerFieldErrors).length > 0) return { fieldErrors: answerFieldErrors };
 
-  const price = event.price != null ? Number(event.price.toString()) : 0;
+  const price = getEffectivePrice(event);
   const passengerPrice = event.passengerPrice != null ? Number(event.passengerPrice.toString()) : 0;
   const subtotal = price + passengerCount * passengerPrice;
 
@@ -144,7 +148,7 @@ export async function submitRegistration(
           vehicleType,
           vehiclePhotoPath,
           passengerCount,
-          priceSnapshot: event.price,
+          priceSnapshot: price,
           passengerPriceSnapshot: passengerCount > 0 ? event.passengerPrice : null,
           discountCodeId: discountId,
           discountAmountSnapshot: discountId ? discountAmount : null,

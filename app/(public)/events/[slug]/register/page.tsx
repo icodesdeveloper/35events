@@ -2,13 +2,17 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth as participantAuth } from "@/lib/auth/participant";
 import RegistrationForm from "@/components/forms/RegistrationForm";
+import { getEffectivePrice } from "@/lib/pricing";
 
 export default async function EventRegisterPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
   const event = await prisma.event.findUnique({
     where: { slug },
-    include: { questionForm: { include: { questions: { orderBy: { order: "asc" } } } } },
+    include: {
+      questionForm: { include: { questions: { orderBy: { order: "asc" } } } },
+      earlybirdPrices: true,
+    },
   });
   if (!event || !event.published) notFound();
   if (!event.registrationOpen) redirect(`/events/${slug}`);
@@ -35,13 +39,16 @@ export default async function EventRegisterPage({ params }: { params: Promise<{ 
         }))
       : [];
 
+  const hasPrice = event.price != null || event.earlybirdPrices.length > 0;
+  const price = hasPrice ? String(getEffectivePrice(event)) : null;
+
   return (
     <div className="mx-auto max-w-xl px-4 py-16 md:px-8">
       <h1 className="mb-1 text-2xl font-semibold text-zinc-900 dark:text-white">Registreren</h1>
       <p className="mb-8 text-slate-600 dark:text-slate-300">{event.name}</p>
       <RegistrationForm
         slug={slug}
-        price={event.price?.toString() ?? null}
+        price={price}
         passengerPrice={event.passengerPrice?.toString() ?? null}
         maxPassengers={event.maxPassengers}
         questions={questions}

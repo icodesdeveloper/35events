@@ -1,12 +1,20 @@
 import Link from "next/link";
 import type { Event } from "@prisma/client";
 import { formatDistance, formatDuration, formatEventDate, formatPrice } from "@/lib/format";
+import { getEffectivePrice, type EarlybirdTier } from "@/lib/pricing";
 
-export default function EventCard({ event, isRegistered }: { event: Event; isRegistered?: boolean }) {
+export default function EventCard({
+  event,
+  isRegistered,
+}: {
+  event: Event & { earlybirdPrices: EarlybirdTier[] };
+  isRegistered?: boolean;
+}) {
+  const hasPrice = event.price != null || event.earlybirdPrices.length > 0;
   const stats = [
     event.distanceKm ? formatDistance(event.distanceKm) : null,
     event.durationMinutes ? formatDuration(event.durationMinutes) : null,
-    event.price != null ? formatPrice(event.price.toString()) : null,
+    hasPrice ? formatPrice(getEffectivePrice(event)) : null,
   ].filter((stat): stat is string => stat !== null);
 
   return (

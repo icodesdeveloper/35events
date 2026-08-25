@@ -60,12 +60,29 @@ model Event {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  media         EventMedia[]
-  registrations Registration[]
-  questionForm  EventQuestionForm?
-  discountCodes DiscountCode[]
+  media           EventMedia[]
+  registrations   Registration[]
+  questionForm    EventQuestionForm?
+  discountCodes   DiscountCode[]
+  earlybirdPrices EarlybirdPrice[]
 
   @@index([date])
+}
+
+// A price tier that applies while its deadline hasn't passed yet — see
+// lib/pricing.ts for how the effective price is resolved (earliest
+// still-valid deadline wins; falls back to Event.price once all have
+// passed, or if there are none).
+model EarlybirdPrice {
+  id        String   @id @default(cuid())
+  eventId   String
+  deadline  DateTime
+  price     Decimal
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
 }
 
 // One optional extra-info form per event — created lazily by the admin UI,
@@ -215,16 +232,17 @@ model Payment {
 // flow. Audience is stored as a filter (not a frozen recipient list) and
 // re-resolved at preview and send time.
 model Campaign {
-  id           String    @id @default(cuid())
-  subject      String
-  bodyHtml     String
-  status       String    @default("DRAFT") // CampaignStatus: DRAFT | SCHEDULED | SENT — see lib/campaigns.ts
-  audienceMode String // AudienceMode: ALL_PARTICIPANTS | EVENTS — see lib/campaigns.ts
-  eventIds     Json? // string[] — only used when audienceMode = EVENTS
-  statuses     Json? // string[] subset of PaymentStatus — only used when audienceMode = EVENTS
-  scheduledAt  DateTime?
-  sentAt       DateTime?
-  sentCount    Int?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  subject        String
+  bodyHtml       String
+  status         String    @default("DRAFT") // CampaignStatus: DRAFT | SCHEDULED | SENT — see lib/campaigns.ts
+  audienceMode   String // AudienceMode: ALL_PARTICIPANTS | EVENTS | SPECIFIC_PARTICIPANTS — see lib/campaigns.ts
+  eventIds       Json? // string[] — only used when audienceMode = EVENTS
+  statuses       Json? // string[] subset of PaymentStatus — only used when audienceMode = EVENTS
+  participantIds Json? // string[] — only used when audienceMode = SPECIFIC_PARTICIPANTS
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+  sentCount      Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }

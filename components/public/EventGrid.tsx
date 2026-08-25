@@ -1,13 +1,14 @@
 import type { Event } from "@prisma/client";
 import EventCard from "@/components/public/EventCard";
 import FadeIn from "@/components/public/FadeIn";
+import type { EarlybirdTier } from "@/lib/pricing";
 
 export default function EventGrid({
   events,
   emptyMessage,
   registeredEventIds,
 }: {
-  events: Event[];
+  events: (Event & { earlybirdPrices: EarlybirdTier[] })[];
   emptyMessage: string;
   registeredEventIds?: Set<string>;
 }) {

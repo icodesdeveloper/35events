@@ -13,13 +13,18 @@ import type { PaymentStatus } from "@/lib/payments";
 export type CampaignFormState = { error?: string; fieldErrors?: Record<string, string> };
 
 function readAudienceFilter(formData: FormData): AudienceFilter {
-  const mode = formData.get("audienceMode") === "EVENTS" ? "EVENTS" : "ALL_PARTICIPANTS";
-  if (mode === "ALL_PARTICIPANTS") return { mode };
-  return {
-    mode,
-    eventIds: formData.getAll("eventIds").map(String),
-    statuses: formData.getAll("statuses").map(String) as PaymentStatus[],
-  };
+  const mode = formData.get("audienceMode");
+  if (mode === "EVENTS") {
+    return {
+      mode: "EVENTS",
+      eventIds: formData.getAll("eventIds").map(String),
+      statuses: formData.getAll("statuses").map(String) as PaymentStatus[],
+    };
+  }
+  if (mode === "SPECIFIC_PARTICIPANTS") {
+    return { mode: "SPECIFIC_PARTICIPANTS", participantIds: formData.getAll("participantIds").map(String) };
+  }
+  return { mode: "ALL_PARTICIPANTS" };
 }
 
 // Single save path for the composer — which of the three buttons ("Concept
@@ -69,6 +74,7 @@ export async function saveCampaign(
     audienceMode: filter.mode,
     eventIds: filter.mode === "EVENTS" ? filter.eventIds : Prisma.JsonNull,
     statuses: filter.mode === "EVENTS" ? filter.statuses : Prisma.JsonNull,
+    participantIds: filter.mode === "SPECIFIC_PARTICIPANTS" ? filter.participantIds : Prisma.JsonNull,
     scheduledAt,
   };
 
@@ -123,8 +129,14 @@ export async function deleteCampaign(campaignId: string) {
   revalidatePath("/admin/communications");
 }
 
-export async function previewAudience(mode: string, eventIds: string[], statuses: string[]): Promise<CampaignRecipient[]> {
-  const filter: AudienceFilter =
-    mode === "EVENTS" ? { mode: "EVENTS", eventIds, statuses: statuses as PaymentStatus[] } : { mode: "ALL_PARTICIPANTS" };
+export async function previewAudience(
+  mode: string,
+  eventIds: string[],
+  statuses: string[],
+  participantIds: string[],
+): Promise<CampaignRecipient[]> {
+  let filter: AudienceFilter = { mode: "ALL_PARTICIPANTS" };
+  if (mode === "EVENTS") filter = { mode: "EVENTS", eventIds, statuses: statuses as PaymentStatus[] };
+  if (mode === "SPECIFIC_PARTICIPANTS") filter = { mode: "SPECIFIC_PARTICIPANTS", participantIds };
   return resolveAudience(filter);
 }

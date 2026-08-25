@@ -27,7 +27,7 @@ export default function DatePickerField({
   required,
   onChange,
 }: {
-  name: string;
+  name?: string;
   defaultValue?: string;
   required?: boolean;
   onChange?: (value: string) => void;
@@ -65,7 +65,7 @@ export default function DatePickerField({
         </span>
         <FontAwesomeIcon icon={faCalendar} className="h-3.5 w-3.5 text-slate-400" />
       </button>
-      <input type="hidden" name={name} value={value} required={required} />
+      {name ? <input type="hidden" name={name} value={value} required={required} /> : null}
 
       {open ? (
         <div className="absolute z-20 mt-2 rounded-xl border border-slate-200 bg-white p-3 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">

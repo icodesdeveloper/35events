@@ -129,7 +129,7 @@ export default function DiscountCodesWorkspace({
             <label className={labelClass} htmlFor="eventId">
               Geldig voor event
             </label>
-            <SelectField id="eventId" name="eventId" defaultValue={editing?.eventId ?? ""}>
+            <SelectField id="eventId" name="eventId" defaultValue={editing?.eventId ?? ""} searchable>
               <option value="">Alle events</option>
               {events.map((event) => (
                 <option key={event.id} value={event.id}>
@@ -143,7 +143,7 @@ export default function DiscountCodesWorkspace({
             <label className={labelClass} htmlFor="participantId">
               Geldig voor gebruiker
             </label>
-            <SelectField id="participantId" name="participantId" defaultValue={editing?.participantId ?? ""}>
+            <SelectField id="participantId" name="participantId" defaultValue={editing?.participantId ?? ""} searchable>
               <option value="">Iedereen</option>
               {participants.map((participant) => (
                 <option key={participant.id} value={participant.id}>

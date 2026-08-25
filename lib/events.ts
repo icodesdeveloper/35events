@@ -23,6 +23,7 @@ export function getUpcomingEvents() {
   return prisma.event.findMany({
     where: upcomingEventWhere(),
     orderBy: { date: "asc" },
+    include: { earlybirdPrices: true },
   });
 }
 
@@ -30,13 +31,14 @@ export function getPastEvents() {
   return prisma.event.findMany({
     where: pastEventWhere(),
     orderBy: { date: "desc" },
+    include: { earlybirdPrices: true },
   });
 }
 
 export function getEventBySlug(slug: string) {
   return prisma.event.findFirst({
     where: { slug, published: true },
-    include: { media: { orderBy: { order: "asc" } } },
+    include: { media: { orderBy: { order: "asc" } }, earlybirdPrices: true },
   });
 }
 
