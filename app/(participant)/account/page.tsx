@@ -6,6 +6,8 @@ import { auth, signOut } from "@/lib/auth/participant";
 import { prisma } from "@/lib/prisma";
 import { formatEventDate, formatPrice } from "@/lib/format";
 import { getExpectedAmount, getPaymentBalance, type PaymentBalanceStatus } from "@/lib/payments";
+import { isRegistrationComplete, type PassengerQuestion } from "@/lib/questionForms";
+import type { QuestionType } from "@/lib/validation/question";
 
 const PAYMENT_STATUS_LABEL: Record<string, string> = {
   PENDING_PAYMENT: "Betaling in afwachting",
@@ -68,9 +70,16 @@ export default async function AccountPage() {
           {registrations.map((registration) => {
             const form = registration.event.questionForm;
             const hasPublishedQuestions = Boolean(form?.published && form.questions.length > 0);
-            const requiredQuestionIds = form?.questions.filter((q) => q.required).map((q) => q.id) ?? [];
-            const answeredIds = new Set(registration.answers.map((a) => a.questionId));
-            const isComplete = requiredQuestionIds.every((qId) => answeredIds.has(qId));
+            const questions: PassengerQuestion[] =
+              form?.questions.map((q) => ({
+                id: q.id,
+                type: q.type as QuestionType,
+                label: q.label,
+                required: q.required,
+                options: Array.isArray(q.options) ? (q.options as string[]) : null,
+                perPassenger: q.perPassenger,
+              })) ?? [];
+            const isComplete = isRegistrationComplete(questions, registration.passengerCount, registration.answers);
 
             const expectedAmount = getExpectedAmount(registration);
             const totalReceived = registration.payments.reduce((sum, payment) => sum + Number(payment.amount.toString()), 0);
@@ -92,9 +101,11 @@ export default async function AccountPage() {
                     </div>
                     <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                       {registration.vehicleMake} {registration.vehicleModel}
-                      {registration.hasPassenger ? " · met passagier" : ""}
+                      {registration.passengerCount > 0
+                        ? ` · ${registration.passengerCount} passagier${registration.passengerCount > 1 ? "s" : ""}`
+                        : ""}
                       {registration.priceSnapshot != null
-                        ? ` · ${formatPrice(registration.priceSnapshot.toString())}`
+                        ? ` · ${formatPrice(getExpectedAmount(registration))}`
                         : ""}
                     </div>
                   </div>

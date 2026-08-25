@@ -4,9 +4,17 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { storage } from "@/lib/storage";
 import type { PaymentStatus } from "@/lib/payments";
+import { notifyPaymentConfirmed } from "@/lib/notifications/payment";
 
 export async function updatePaymentStatus(eventId: string, registrationId: string, status: PaymentStatus) {
+  const current = await prisma.registration.findUnique({
+    where: { id: registrationId },
+    select: { paymentStatus: true },
+  });
   await prisma.registration.update({ where: { id: registrationId }, data: { paymentStatus: status } });
+  if (status === "CONFIRMED" && current?.paymentStatus !== "CONFIRMED") {
+    await notifyPaymentConfirmed(registrationId);
+  }
   revalidatePath(`/admin/events/${eventId}/registrations`);
 }
 

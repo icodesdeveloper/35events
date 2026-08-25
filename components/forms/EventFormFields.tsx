@@ -2,6 +2,7 @@ import type { Event } from "@prisma/client";
 import FileDropzone from "@/components/admin/FileDropzone";
 import DatePickerField from "@/components/admin/DatePickerField";
 import Switch from "@/components/admin/Switch";
+import RichTextEditor from "@/components/admin/RichTextEditor";
 
 // Prisma's Decimal is a class instance, not a plain object — it can't cross
 // the server/client boundary as a prop, so callers pass price/passengerPrice
@@ -47,17 +48,8 @@ export default function EventFormFields({
       </div>
 
       <div>
-        <label className={labelClass} htmlFor="description">
-          Beschrijving (markdown)
-        </label>
-        <textarea
-          id="description"
-          name="description"
-          defaultValue={event?.description}
-          rows={8}
-          className={fieldClass}
-          required
-        />
+        <label className={labelClass}>Beschrijving</label>
+        <RichTextEditor name="description" defaultValue={event?.description} placeholder="Beschrijf het event..." />
         {errors.description ? (
           <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.description}</p>
         ) : null}
@@ -138,6 +130,24 @@ export default function EventFormFields({
       </div>
 
       <div>
+        <label className={labelClass} htmlFor="maxPassengers">
+          Max. aantal passagiers
+        </label>
+        <input
+          id="maxPassengers"
+          name="maxPassengers"
+          type="number"
+          step="1"
+          min="0"
+          defaultValue={event?.maxPassengers ?? 0}
+          className={fieldClass}
+        />
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          0 = geen passagiers toegelaten bij registratie voor dit event.
+        </p>
+      </div>
+
+      <div>
         <label className={labelClass}>Coverfoto {event?.coverImagePath ? "(vervangen)" : ""}</label>
         <FileDropzone
           name="coverImage"
@@ -145,6 +155,10 @@ export default function EventFormFields({
           existingPreviewUrl={event?.coverImagePath ? `/api/media/${event.coverImagePath}` : undefined}
           helpText="PNG of JPG, geen groottelimiet"
         />
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          Ideale afmetingen: minstens 1920 × 1080 px, liggend formaat — de foto wordt zowel breed (als banner) als
+          rechtopstaand (4:5, als kaart) uitgesneden.
+        </p>
       </div>
 
       <div className="flex gap-8">

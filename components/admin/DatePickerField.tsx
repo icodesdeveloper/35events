@@ -25,10 +25,12 @@ export default function DatePickerField({
   name,
   defaultValue,
   required,
+  onChange,
 }: {
   name: string;
   defaultValue?: string;
   required?: boolean;
+  onChange?: (value: string) => void;
 }) {
   const [value, setValue] = useState(defaultValue ?? "");
   const [open, setOpen] = useState(false);
@@ -74,7 +76,9 @@ export default function DatePickerField({
             defaultMonth={selectedDate ?? new Date()}
             onSelect={(date) => {
               if (date) {
-                setValue(toISODate(date));
+                const iso = toISODate(date);
+                setValue(iso);
+                onChange?.(iso);
                 setOpen(false);
               }
             }}

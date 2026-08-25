@@ -9,6 +9,7 @@ export type AnswersTableRow = {
   registrationId: string;
   participant: string;
   vehicle: string;
+  paid: boolean;
   answers: Record<string, string>;
 };
 
@@ -68,6 +69,7 @@ export default function AnswersTable({ columns, rows }: { columns: AnswersTableC
                 <SortIcon active={sortKey === "vehicle"} dir={sortDir} />
               </button>
             </th>
+            <th className="px-5 py-3 font-medium">Betaald</th>
             {columns.map((column) => (
               <th key={column.id} className="px-5 py-3 font-medium">
                 <button
@@ -89,6 +91,17 @@ export default function AnswersTable({ columns, rows }: { columns: AnswersTableC
                 {row.participant}
               </td>
               <td className="px-5 py-3 whitespace-nowrap text-slate-600 dark:text-slate-300">{row.vehicle}</td>
+              <td className="px-5 py-3">
+                <span
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ${
+                    row.paid
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                      : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                  }`}
+                >
+                  {row.paid ? "Betaald" : "Nog niet"}
+                </span>
+              </td>
               {columns.map((column) => (
                 <td key={column.id} className="px-5 py-3 text-slate-600 dark:text-slate-300">
                   {row.answers[column.id] || "—"}
@@ -98,7 +111,7 @@ export default function AnswersTable({ columns, rows }: { columns: AnswersTableC
           ))}
           {sorted.length === 0 ? (
             <tr>
-              <td colSpan={2 + columns.length} className="px-5 py-8 text-center text-slate-500 dark:text-slate-400">
+              <td colSpan={3 + columns.length} className="px-5 py-8 text-center text-slate-500 dark:text-slate-400">
                 Nog geen registraties.
               </td>
             </tr>

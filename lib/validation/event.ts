@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sanitizeContentHtml } from "@/lib/sanitizeHtml";
 
 const optionalPositiveNumber = z.preprocess(
   (value) => (value === "" || value === null || value === undefined ? undefined : Number(value)),
@@ -18,7 +19,12 @@ export const eventFormSchema = z
       .trim()
       .min(1, "Slug is verplicht")
       .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Enkel kleine letters, cijfers en koppeltekens"),
-    description: z.string().trim().min(1, "Beschrijving is verplicht"),
+    description: z
+      .string()
+      .trim()
+      .min(1, "Beschrijving is verplicht")
+      .transform((html) => sanitizeContentHtml(html))
+      .refine((html) => html.trim().length > 0, { message: "Beschrijving is verplicht" }),
     date: z.string().min(1, "Datum is verplicht"),
     endDate: z.string().optional(),
     distanceKm: optionalPositiveNumber,
@@ -28,6 +34,10 @@ export const eventFormSchema = z
     ),
     price: optionalNonNegativeNumber,
     passengerPrice: optionalNonNegativeNumber,
+    maxPassengers: z.preprocess(
+      (value) => (value === "" || value === null || value === undefined ? 0 : Number(value)),
+      z.number().int().min(0, "Kan niet negatief zijn"),
+    ),
     published: z.preprocess((value) => value === "on" || value === true, z.boolean()),
     registrationOpen: z.preprocess((value) => value === "on" || value === true, z.boolean()),
   })
@@ -51,6 +61,7 @@ export function parseEventFormData(
     durationMinutes: formData.get("durationMinutes") || undefined,
     price: formData.get("price") || undefined,
     passengerPrice: formData.get("passengerPrice") || undefined,
+    maxPassengers: formData.get("maxPassengers") || undefined,
     published: formData.get("published"),
     registrationOpen: formData.get("registrationOpen"),
   };

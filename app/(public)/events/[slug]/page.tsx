@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import ReactMarkdown from "react-markdown";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleCheck } from "@fortawesome/free-solid-svg-icons";
 import { getEventBySlug } from "@/lib/events";
@@ -94,9 +93,10 @@ export default async function EventDetailPage({
           </div>
         ) : null}
 
-        <div className="prose prose-invert prose-p:text-white/70 prose-headings:font-display mt-10 max-w-none">
-          <ReactMarkdown>{event.description}</ReactMarkdown>
-        </div>
+        <div
+          className="prose prose-invert prose-p:text-white/70 prose-headings:font-display mt-10 max-w-none"
+          dangerouslySetInnerHTML={{ __html: event.description }}
+        />
 
         <MediaGallery media={event.media} />
       </div>

@@ -7,14 +7,15 @@ import {
   type ExtraInfoState,
 } from "@/app/(participant)/account/registrations/[id]/extra-info/actions";
 import SelectField from "@/components/admin/SelectField";
+import { expandQuestionsForPassengers } from "@/lib/questionForms";
 
 export type ExtraInfoQuestionField = {
   id: string;
   type: QuestionType;
   label: string;
   required: boolean;
+  perPassenger: boolean;
   options: string[] | null;
-  defaultValue: string;
 };
 
 const fieldClass =
@@ -23,24 +24,37 @@ const labelClass = "mb-1.5 block text-sm font-medium text-zinc-700 dark:text-sla
 
 export default function ExtraInfoForm({
   registrationId,
+  passengerCount,
   questions,
+  answers,
 }: {
   registrationId: string;
+  passengerCount: number;
   questions: ExtraInfoQuestionField[];
+  answers: { questionId: string; passengerIndex: number; value: string }[];
 }) {
   const action = submitExtraInfoAnswers.bind(null, registrationId);
   const [state, formAction, pending] = useActionState<ExtraInfoState, FormData>(action, {});
   const errors = state.fieldErrors ?? {};
 
+  const answersByField = new Map(answers.map((a) => [`${a.questionId}:${a.passengerIndex}`, a.value]));
+  const expandedQuestions = expandQuestionsForPassengers(questions, passengerCount);
+
   return (
     <form action={formAction} className="space-y-5">
-      {questions.map((question) => (
-        <div key={question.id}>
-          <label className={labelClass} htmlFor={question.id}>
-            {question.label} {question.required ? <span className="text-red-500">*</span> : null}
+      {expandedQuestions.map(({ question, passengerIndex, fieldName, personLabel }) => (
+        <div key={fieldName}>
+          <label className={labelClass} htmlFor={fieldName}>
+            {question.label}
+            {personLabel ? ` — ${personLabel}` : ""} {question.required ? <span className="text-red-500">*</span> : null}
           </label>
           {question.type === "SELECT" ? (
-            <SelectField id={question.id} name={question.id} defaultValue={question.defaultValue} required={question.required}>
+            <SelectField
+              id={fieldName}
+              name={fieldName}
+              defaultValue={answersByField.get(`${question.id}:${passengerIndex}`) ?? ""}
+              required={question.required}
+            >
               <option value="">Kies...</option>
               {question.options?.map((option) => (
                 <option key={option} value={option}>
@@ -50,17 +64,15 @@ export default function ExtraInfoForm({
             </SelectField>
           ) : (
             <input
-              id={question.id}
-              name={question.id}
+              id={fieldName}
+              name={fieldName}
               type={question.type === "EMAIL" ? "email" : question.type === "NUMBER" ? "number" : "text"}
-              defaultValue={question.defaultValue}
+              defaultValue={answersByField.get(`${question.id}:${passengerIndex}`) ?? ""}
               className={fieldClass}
               required={question.required}
             />
           )}
-          {errors[question.id] ? (
-            <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors[question.id]}</p>
-          ) : null}
+          {errors[fieldName] ? <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors[fieldName]}</p> : null}
         </div>
       ))}
 

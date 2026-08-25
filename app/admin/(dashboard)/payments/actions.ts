@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getExpectedAmount, getPaymentBalance, type PaymentBalanceStatus } from "@/lib/payments";
+import { notifyPaymentConfirmed } from "@/lib/notifications/payment";
 
 export type RecordPaymentResult =
   | {
@@ -41,6 +42,7 @@ export async function recordPayment(paymentReferenceRaw: string, amountRaw: stri
   if ((balance === "PAID" || balance === "OVERPAID") && registration.paymentStatus === "PENDING_PAYMENT") {
     await prisma.registration.update({ where: { id: registration.id }, data: { paymentStatus: "CONFIRMED" } });
     confirmed = true;
+    await notifyPaymentConfirmed(registration.id);
   }
 
   revalidatePath("/admin/payments");

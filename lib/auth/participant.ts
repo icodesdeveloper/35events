@@ -45,7 +45,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const participant = await prisma.participant.findFirst({
           where: { OR: [{ email: identifier.toLowerCase() }, { username: identifier }] },
         });
-        if (!participant?.passwordHash) return null;
+        if (!participant?.passwordHash || participant.disabledAt) return null;
 
         const valid = await verify(participant.passwordHash, password);
         if (!valid) return null;
@@ -62,7 +62,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (typeof email !== "string" || typeof token !== "string") return null;
 
         const participant = await prisma.participant.findUnique({ where: { email: email.toLowerCase() } });
-        if (!participant) return null;
+        if (!participant || participant.disabledAt) return null;
 
         const tokenHash = hashMagicLinkToken(token);
         const record = await prisma.participantMagicLinkToken.findUnique({ where: { tokenHash } });

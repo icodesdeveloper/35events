@@ -1,8 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { sendMail } from "@/lib/mail/transporter";
 import { extraInfoRequestEmail, extraInfoReminderEmail } from "@/lib/mail/templates";
-
-const SITE_URL = process.env.SITE_URL ?? "http://localhost:3000";
+import { SITE_URL } from "@/lib/site";
 const FOUR_DAYS_MS = 4 * 24 * 60 * 60 * 1000;
 
 function extraInfoUrl(registrationId: string): string {

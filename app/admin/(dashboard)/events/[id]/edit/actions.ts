@@ -12,6 +12,7 @@ export type QuestionItem = {
   type: QuestionType;
   label: string;
   required: boolean;
+  perPassenger: boolean;
   options: string[] | null;
   order: number;
 };
@@ -33,6 +34,7 @@ type DraftQuestionInput = {
   type: string;
   label: string;
   required: boolean;
+  perPassenger: boolean;
   options?: string;
 };
 
@@ -74,6 +76,7 @@ export async function saveEventEdit(
     type: QuestionType;
     label: string;
     required: boolean;
+    perPassenger: boolean;
     options: string[] | undefined;
   }[] = [];
   for (const q of draftQuestions) {
@@ -98,6 +101,7 @@ export async function saveEventEdit(
       type: type as QuestionType,
       label,
       required,
+      perPassenger: Boolean(q.perPassenger),
       options: type === "SELECT" ? parseOptions(options) : undefined,
     });
   }
@@ -130,6 +134,7 @@ export async function saveEventEdit(
         durationMinutes: data.durationMinutes ?? null,
         price: data.price ?? null,
         passengerPrice: data.passengerPrice ?? null,
+        maxPassengers: data.maxPassengers,
         published: data.published,
         registrationOpen: data.registrationOpen,
         coverImagePath,
@@ -145,11 +150,26 @@ export async function saveEventEdit(
       if (q.id) {
         await tx.eventQuestion.update({
           where: { id: q.id },
-          data: { type: q.type, label: q.label, required: q.required, options: q.options, order: index },
+          data: {
+            type: q.type,
+            label: q.label,
+            required: q.required,
+            perPassenger: q.perPassenger,
+            options: q.options,
+            order: index,
+          },
         });
       } else {
         await tx.eventQuestion.create({
-          data: { formId, type: q.type, label: q.label, required: q.required, options: q.options, order: index },
+          data: {
+            formId,
+            type: q.type,
+            label: q.label,
+            required: q.required,
+            perPassenger: q.perPassenger,
+            options: q.options,
+            order: index,
+          },
         });
       }
     }
@@ -184,6 +204,7 @@ export async function saveEventEdit(
       type: q.type as QuestionType,
       label: q.label,
       required: q.required,
+      perPassenger: q.perPassenger,
       options: Array.isArray(q.options) ? (q.options as string[]) : null,
       order: q.order,
     })),

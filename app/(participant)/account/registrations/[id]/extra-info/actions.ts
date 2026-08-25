@@ -1,10 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { auth as participantAuth } from "@/lib/auth/participant";
-import { getExtraInfoAvailability, EXTRA_INFO_CLOSED_MESSAGE } from "@/lib/questionForms";
+import { getExtraInfoAvailability, EXTRA_INFO_CLOSED_MESSAGE, collectQuestionAnswers } from "@/lib/questionForms";
+import type { QuestionType } from "@/lib/validation/question";
 
 export type ExtraInfoState = { error?: string; fieldErrors?: Record<string, string> };
 
@@ -31,44 +31,25 @@ export async function submitExtraInfoAnswers(
   const availability = getExtraInfoAvailability(form);
   if (!availability.open) return { error: EXTRA_INFO_CLOSED_MESSAGE[availability.reason] };
 
-  const fieldErrors: Record<string, string> = {};
-  const values: { questionId: string; value: string }[] = [];
+  const questions = form.questions.map((q) => ({
+    id: q.id,
+    type: q.type as QuestionType,
+    label: q.label,
+    required: q.required,
+    perPassenger: q.perPassenger,
+    options: Array.isArray(q.options) ? (q.options as string[]) : null,
+  }));
 
-  for (const question of form.questions) {
-    const raw = formData.get(question.id);
-    const value = typeof raw === "string" ? raw.trim() : "";
-
-    if (!value) {
-      if (question.required) fieldErrors[question.id] = "Dit veld is verplicht";
-      continue;
-    }
-
-    if (question.type === "EMAIL" && !z.email().safeParse(value).success) {
-      fieldErrors[question.id] = "Ongeldig e-mailadres";
-      continue;
-    }
-    if (question.type === "NUMBER" && Number.isNaN(Number(value))) {
-      fieldErrors[question.id] = "Moet een nummer zijn";
-      continue;
-    }
-    if (question.type === "SELECT") {
-      const options = Array.isArray(question.options) ? (question.options as string[]) : [];
-      if (!options.includes(value)) {
-        fieldErrors[question.id] = "Ongeldige keuze";
-        continue;
-      }
-    }
-
-    values.push({ questionId: question.id, value });
-  }
-
+  const { fieldErrors, values } = collectQuestionAnswers(questions, registration.passengerCount, formData, {
+    enforceRequired: true,
+  });
   if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
 
   await prisma.$transaction(
-    values.map(({ questionId, value }) =>
+    values.map(({ questionId, passengerIndex, value }) =>
       prisma.eventQuestionAnswer.upsert({
-        where: { questionId_registrationId: { questionId, registrationId } },
-        create: { questionId, registrationId, value },
+        where: { questionId_registrationId_passengerIndex: { questionId, registrationId, passengerIndex } },
+        create: { questionId, registrationId, passengerIndex, value },
         update: { value },
       }),
     ),

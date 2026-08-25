@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus, faPen, faTrash, faImages, faUsers, faListCheck, faChartSimple } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faPen, faTrash, faImages, faUsers, faChartSimple } from "@fortawesome/free-solid-svg-icons";
 import { prisma } from "@/lib/prisma";
 import { formatEventDate } from "@/lib/format";
 import { deleteEvent, togglePublished, toggleRegistration } from "@/app/admin/(dashboard)/events/actions";
 import ConfirmSubmitButton from "@/components/admin/ConfirmSubmitButton";
+import Tooltip from "@/components/admin/Tooltip";
 
 export default async function AdminEventsPage() {
   const events = await prisma.event.findMany({ orderBy: { date: "desc" } });
@@ -70,50 +71,53 @@ export default async function AdminEventsPage() {
                 </td>
                 <td className="px-5 py-3">
                   <div className="flex items-center justify-end gap-3">
-                    <Link
-                      href={`/admin/events/${event.id}/registrations`}
-                      className="text-slate-400 transition-colors hover:text-zinc-900 dark:hover:text-white"
-                      aria-label="Registraties"
-                    >
-                      <FontAwesomeIcon icon={faUsers} className="h-3.5 w-3.5" />
-                    </Link>
-                    <Link
-                      href={`/admin/events/${event.id}/media`}
-                      className="text-slate-400 transition-colors hover:text-zinc-900 dark:hover:text-white"
-                      aria-label="Media"
-                    >
-                      <FontAwesomeIcon icon={faImages} className="h-3.5 w-3.5" />
-                    </Link>
-                    <Link
-                      href={`/admin/events/${event.id}/edit#vragen`}
-                      className="text-slate-400 transition-colors hover:text-zinc-900 dark:hover:text-white"
-                      aria-label="Bijkomende vragen"
-                    >
-                      <FontAwesomeIcon icon={faListCheck} className="h-3.5 w-3.5" />
-                    </Link>
-                    <Link
-                      href={`/admin/events/${event.id}/questions/answers`}
-                      className="text-slate-400 transition-colors hover:text-zinc-900 dark:hover:text-white"
-                      aria-label="Antwoorden"
-                    >
-                      <FontAwesomeIcon icon={faChartSimple} className="h-3.5 w-3.5" />
-                    </Link>
-                    <Link
-                      href={`/admin/events/${event.id}/edit`}
-                      className="text-slate-400 transition-colors hover:text-zinc-900 dark:hover:text-white"
-                      aria-label="Bewerken"
-                    >
-                      <FontAwesomeIcon icon={faPen} className="h-3.5 w-3.5" />
-                    </Link>
-                    <form action={deleteEvent.bind(null, event.id)}>
-                      <ConfirmSubmitButton
-                        confirmMessage={`"${event.name}" verwijderen? Dit kan niet ongedaan gemaakt worden.`}
-                        className="text-slate-400 transition-colors hover:text-red-600 dark:hover:text-red-400"
-                        ariaLabel="Verwijderen"
+                    <Tooltip label="Registraties bekijken">
+                      <Link
+                        href={`/admin/events/${event.id}/registrations`}
+                        className="text-slate-400 transition-colors hover:text-zinc-900 dark:hover:text-white"
+                        aria-label="Registraties"
                       >
-                        <FontAwesomeIcon icon={faTrash} className="h-3.5 w-3.5" />
-                      </ConfirmSubmitButton>
-                    </form>
+                        <FontAwesomeIcon icon={faUsers} className="h-3.5 w-3.5" />
+                      </Link>
+                    </Tooltip>
+                    <Tooltip label="Foto's en video's beheren">
+                      <Link
+                        href={`/admin/events/${event.id}/media`}
+                        className="text-slate-400 transition-colors hover:text-zinc-900 dark:hover:text-white"
+                        aria-label="Media"
+                      >
+                        <FontAwesomeIcon icon={faImages} className="h-3.5 w-3.5" />
+                      </Link>
+                    </Tooltip>
+                    <Tooltip label="Antwoorden op bijkomende vragen bekijken">
+                      <Link
+                        href={`/admin/events/${event.id}/questions/answers`}
+                        className="text-slate-400 transition-colors hover:text-zinc-900 dark:hover:text-white"
+                        aria-label="Antwoorden"
+                      >
+                        <FontAwesomeIcon icon={faChartSimple} className="h-3.5 w-3.5" />
+                      </Link>
+                    </Tooltip>
+                    <Tooltip label="Event en bijkomende vragen bewerken">
+                      <Link
+                        href={`/admin/events/${event.id}/edit`}
+                        className="text-slate-400 transition-colors hover:text-zinc-900 dark:hover:text-white"
+                        aria-label="Bewerken"
+                      >
+                        <FontAwesomeIcon icon={faPen} className="h-3.5 w-3.5" />
+                      </Link>
+                    </Tooltip>
+                    <Tooltip label="Event verwijderen">
+                      <form action={deleteEvent.bind(null, event.id)}>
+                        <ConfirmSubmitButton
+                          confirmMessage={`"${event.name}" verwijderen? Dit kan niet ongedaan gemaakt worden.`}
+                          className="text-slate-400 transition-colors hover:text-red-600 dark:hover:text-red-400"
+                          ariaLabel="Verwijderen"
+                        >
+                          <FontAwesomeIcon icon={faTrash} className="h-3.5 w-3.5" />
+                        </ConfirmSubmitButton>
+                      </form>
+                    </Tooltip>
                   </div>
                 </td>
               </tr>

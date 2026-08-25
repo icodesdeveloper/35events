@@ -22,6 +22,7 @@ type DraftQuestion = {
   type: QuestionType;
   label: string;
   required: boolean;
+  perPassenger: boolean;
   options: string;
 };
 
@@ -39,6 +40,7 @@ function toDraft(q: QuestionItem): DraftQuestion {
     type: q.type,
     label: q.label,
     required: q.required,
+    perPassenger: q.perPassenger,
     options: q.options?.join("\n") ?? "",
   };
 }
@@ -96,7 +98,7 @@ export default function EventEditWorkspace({
   function addQuestionRow() {
     setQuestions((prev) => [
       ...prev,
-      { clientKey: crypto.randomUUID(), type: "TEXT", label: "", required: false, options: "" },
+      { clientKey: crypto.randomUUID(), type: "TEXT", label: "", required: false, perPassenger: false, options: "" },
     ]);
   }
 
@@ -115,7 +117,15 @@ export default function EventEditWorkspace({
 
   const busy = pending || unpublishPending;
   const questionsJson = JSON.stringify(
-    questions.map(({ clientKey, id, type, label, required, options }) => ({ clientKey, id, type, label, required, options })),
+    questions.map(({ clientKey, id, type, label, required, perPassenger, options }) => ({
+      clientKey,
+      id,
+      type,
+      label,
+      required,
+      perPassenger,
+      options,
+    })),
   );
 
   return (
@@ -248,6 +258,11 @@ export default function EventEditWorkspace({
                       onChange={(e) => updateQuestion(q.clientKey, { required: e.target.checked })}
                     />
                   </div>
+                  <Checkbox
+                    label="Per passagier stellen (bv. gerechtkeuze per persoon)"
+                    checked={q.perPassenger}
+                    onChange={(e) => updateQuestion(q.clientKey, { perPassenger: e.target.checked })}
+                  />
                   {q.type === "SELECT" ? (
                     <textarea
                       value={q.options}

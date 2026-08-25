@@ -32,6 +32,7 @@ export async function createEvent(_prevState: EventFormState, formData: FormData
       durationMinutes: data.durationMinutes ?? null,
       price: data.price ?? null,
       passengerPrice: data.passengerPrice ?? null,
+      maxPassengers: data.maxPassengers,
       published: data.published,
       registrationOpen: data.registrationOpen,
       coverImagePath,

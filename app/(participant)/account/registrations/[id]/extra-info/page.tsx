@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth as participantAuth } from "@/lib/auth/participant";
 import ExtraInfoForm, { type ExtraInfoQuestionField } from "@/components/forms/ExtraInfoForm";
-import { getExtraInfoAvailability, EXTRA_INFO_CLOSED_MESSAGE } from "@/lib/questionForms";
+import { getExtraInfoAvailability, EXTRA_INFO_CLOSED_MESSAGE, passengerLabel } from "@/lib/questionForms";
 
 export default async function ExtraInfoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -23,7 +23,9 @@ export default async function ExtraInfoPage({ params }: { params: Promise<{ id: 
   const form = registration.event.questionForm;
   if (!form || form.questions.length === 0) redirect("/account");
 
-  const answersByQuestion = new Map(registration.answers.map((answer) => [answer.questionId, answer.value]));
+  const answersByField = new Map(
+    registration.answers.map((answer) => [`${answer.questionId}:${answer.passengerIndex}`, answer.value]),
+  );
   const availability = getExtraInfoAvailability(form);
 
   if (!availability.open) {
@@ -38,14 +40,27 @@ export default async function ExtraInfoPage({ params }: { params: Promise<{ id: 
 
         {registration.answers.length > 0 ? (
           <div className="mt-6 space-y-3">
-            {form.questions.map((question) => (
-              <div key={question.id}>
-                <div className="text-sm font-medium text-zinc-900 dark:text-white">{question.label}</div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">
-                  {answersByQuestion.get(question.id) || "—"}
+            {form.questions.map((question) =>
+              question.perPassenger ? (
+                Array.from({ length: registration.passengerCount + 1 }, (_, index) => (
+                  <div key={`${question.id}:${index}`}>
+                    <div className="text-sm font-medium text-zinc-900 dark:text-white">
+                      {question.label} — {passengerLabel(index)}
+                    </div>
+                    <div className="text-sm text-slate-500 dark:text-slate-400">
+                      {answersByField.get(`${question.id}:${index}`) || "—"}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div key={question.id}>
+                  <div className="text-sm font-medium text-zinc-900 dark:text-white">{question.label}</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">
+                    {answersByField.get(`${question.id}:0`) || "—"}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ),
+            )}
           </div>
         ) : null}
       </div>
@@ -58,13 +73,21 @@ export default async function ExtraInfoPage({ params }: { params: Promise<{ id: 
       <p className="mb-8 text-slate-600 dark:text-slate-300">{registration.event.name}</p>
       <ExtraInfoForm
         registrationId={registration.id}
-        questions={form.questions.map((question) => ({
-          id: question.id,
-          type: question.type as ExtraInfoQuestionField["type"],
-          label: question.label,
-          required: question.required,
-          options: Array.isArray(question.options) ? (question.options as string[]) : null,
-          defaultValue: answersByQuestion.get(question.id) ?? "",
+        passengerCount={registration.passengerCount}
+        questions={form.questions.map(
+          (question): ExtraInfoQuestionField => ({
+            id: question.id,
+            type: question.type as ExtraInfoQuestionField["type"],
+            label: question.label,
+            required: question.required,
+            perPassenger: question.perPassenger,
+            options: Array.isArray(question.options) ? (question.options as string[]) : null,
+          }),
+        )}
+        answers={registration.answers.map((a) => ({
+          questionId: a.questionId,
+          passengerIndex: a.passengerIndex,
+          value: a.value,
         }))}
       />
     </div>

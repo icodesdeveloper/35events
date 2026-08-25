@@ -20,6 +20,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
     type: q.type as QuestionItem["type"],
     label: q.label,
     required: q.required,
+    perPassenger: q.perPassenger,
     options: Array.isArray(q.options) ? (q.options as string[]) : null,
     order: q.order,
   }));

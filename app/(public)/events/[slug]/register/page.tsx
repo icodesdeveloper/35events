@@ -6,7 +6,10 @@ import RegistrationForm from "@/components/forms/RegistrationForm";
 export default async function EventRegisterPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  const event = await prisma.event.findUnique({ where: { slug } });
+  const event = await prisma.event.findUnique({
+    where: { slug },
+    include: { questionForm: { include: { questions: { orderBy: { order: "asc" } } } } },
+  });
   if (!event || !event.published) notFound();
   if (!event.registrationOpen) redirect(`/events/${slug}`);
 
@@ -20,6 +23,18 @@ export default async function EventRegisterPage({ params }: { params: Promise<{ 
   });
   if (existing) redirect(`/events/${slug}/register/success`);
 
+  const questions =
+    event.questionForm?.published
+      ? event.questionForm.questions.map((q) => ({
+          id: q.id,
+          type: q.type as "TEXT" | "EMAIL" | "NUMBER" | "SELECT",
+          label: q.label,
+          required: q.required,
+          options: Array.isArray(q.options) ? (q.options as string[]) : null,
+          perPassenger: q.perPassenger,
+        }))
+      : [];
+
   return (
     <div className="mx-auto max-w-xl px-4 py-16 md:px-8">
       <h1 className="mb-1 text-2xl font-semibold text-zinc-900 dark:text-white">Registreren</h1>
@@ -28,6 +43,8 @@ export default async function EventRegisterPage({ params }: { params: Promise<{ 
         slug={slug}
         price={event.price?.toString() ?? null}
         passengerPrice={event.passengerPrice?.toString() ?? null}
+        maxPassengers={event.maxPassengers}
+        questions={questions}
       />
     </div>
   );

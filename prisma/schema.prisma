@@ -20,11 +20,13 @@ model Participant {
   username        String    @unique
   passwordHash    String?
   emailVerifiedAt DateTime?
+  disabledAt      DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
   magicLinkTokens ParticipantMagicLinkToken[]
   registrations   Registration[]
+  discountCodes   DiscountCode[]
 }
 
 model ParticipantMagicLinkToken {
@@ -51,6 +53,7 @@ model Event {
   durationMinutes  Int?
   price            Decimal?
   passengerPrice   Decimal?
+  maxPassengers    Int       @default(0)
   coverImagePath   String?
   published        Boolean   @default(false)
   registrationOpen Boolean   @default(false)
@@ -60,6 +63,7 @@ model Event {
   media         EventMedia[]
   registrations Registration[]
   questionForm  EventQuestionForm?
+  discountCodes DiscountCode[]
 
   @@index([date])
 }
@@ -84,13 +88,14 @@ model EventQuestionForm {
 }
 
 model EventQuestion {
-  id       String  @id @default(cuid())
-  formId   String
-  type     String // QuestionType: TEXT | EMAIL | NUMBER | SELECT — see lib/validation/question.ts
-  label    String
-  required Boolean @default(false)
-  options  Json? // string[] — only used for SELECT
-  order    Int     @default(0)
+  id           String  @id @default(cuid())
+  formId       String
+  type         String // QuestionType: TEXT | EMAIL | NUMBER | SELECT — see lib/validation/question.ts
+  label        String
+  required     Boolean @default(false)
+  perPassenger Boolean @default(false) // asked once per person (driver + each passenger) instead of once per registration
+  options      Json? // string[] — only used for SELECT
+  order        Int     @default(0)
 
   form    EventQuestionForm     @relation(fields: [formId], references: [id], onDelete: Cascade)
   answers EventQuestionAnswer[]
@@ -102,13 +107,16 @@ model EventQuestionAnswer {
   id             String   @id @default(cuid())
   questionId     String
   registrationId String
+  // 0 = the registrant/driver, 1..N = the Nth passenger — always 0 for
+  // questions that aren't perPassenger. See lib/questionForms.ts.
+  passengerIndex Int      @default(0)
   value          String
   updatedAt      DateTime @updatedAt
 
   question     EventQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
   registration Registration  @relation(fields: [registrationId], references: [id], onDelete: Cascade)
 
-  @@unique([questionId, registrationId])
+  @@unique([questionId, registrationId, passengerIndex])
 }
 
 model EventMedia {
@@ -133,9 +141,11 @@ model Registration {
   vehicleModel            String
   vehicleType             String?
   vehiclePhotoPath        String
-  hasPassenger            Boolean   @default(false)
+  passengerCount          Int       @default(0)
   priceSnapshot           Decimal?
   passengerPriceSnapshot  Decimal?
+  discountCodeId          String?
+  discountAmountSnapshot  Decimal?
   paymentStatus           String    @default("PENDING_PAYMENT") // PaymentStatus: PENDING_PAYMENT | CONFIRMED | CANCELLED — see lib/payments.ts
   // Short code the participant puts in the bank transfer description so an
   // incoming payment can be matched back to this registration — see
@@ -149,12 +159,39 @@ model Registration {
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 
-  event       Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  participant Participant           @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  answers     EventQuestionAnswer[]
-  payments    Payment[]
+  event        Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  participant  Participant           @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  discountCode DiscountCode?         @relation(fields: [discountCodeId], references: [id], onDelete: SetNull)
+  answers      EventQuestionAnswer[]
+  payments     Payment[]
 
   @@unique([eventId, participantId])
+  @@index([eventId])
+  @@index([participantId])
+  @@index([discountCodeId])
+}
+
+// Percentage or fixed-amount discount, redeemed by the participant at
+// registration time (see app/(public)/events/[slug]/register/actions.ts and
+// lib/discounts.ts). Optionally scoped to one event and/or one participant,
+// a validity window, and a use-count cap.
+model DiscountCode {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  type          String // DiscountType: PERCENT | FIXED — see lib/discounts.ts
+  value         Decimal
+  eventId       String?
+  participantId String?
+  validFrom     DateTime?
+  validUntil    DateTime?
+  maxUses       Int?
+  useCount      Int       @default(0)
+  createdAt     DateTime  @default(now())
+
+  event         Event?         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  participant   Participant?   @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  registrations Registration[]
+
   @@index([eventId])
   @@index([participantId])
 }
@@ -171,4 +208,23 @@ model Payment {
   registration Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
 
   @@index([registrationId])
+}
+
+// A mass mail to participants — see lib/campaigns.ts for audience resolution
+// and app/admin/(dashboard)/communications/actions.ts for the send/schedule
+// flow. Audience is stored as a filter (not a frozen recipient list) and
+// re-resolved at preview and send time.
+model Campaign {
+  id           String    @id @default(cuid())
+  subject      String
+  bodyHtml     String
+  status       String    @default("DRAFT") // CampaignStatus: DRAFT | SCHEDULED | SENT — see lib/campaigns.ts
+  audienceMode String // AudienceMode: ALL_PARTICIPANTS | EVENTS — see lib/campaigns.ts
+  eventIds     Json? // string[] — only used when audienceMode = EVENTS
+  statuses     Json? // string[] subset of PaymentStatus — only used when audienceMode = EVENTS
+  scheduledAt  DateTime?
+  sentAt       DateTime?
+  sentCount    Int?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }

@@ -5,10 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { generateMagicLinkToken, hashMagicLinkToken } from "@/lib/auth/magicLinkToken";
 import { sendMail } from "@/lib/mail/transporter";
 import { magicLinkEmail } from "@/lib/mail/templates";
+import { SITE_URL } from "@/lib/site";
 
 export type MagicLinkState = { sent?: boolean; error?: string };
 
-const SITE_URL = process.env.SITE_URL ?? "http://localhost:3000";
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
 export async function requestMagicLink(
@@ -26,6 +26,11 @@ export async function requestMagicLink(
       data: { email: normalizedEmail, username: `deelnemer-${randomUUID().slice(0, 8)}` },
     });
   }
+
+  // Pretend the link was sent either way — a distinct response for a
+  // deactivated account would let someone enumerate which emails have
+  // accounts here.
+  if (participant.disabledAt) return { sent: true };
 
   const token = generateMagicLinkToken();
   await prisma.participantMagicLinkToken.create({

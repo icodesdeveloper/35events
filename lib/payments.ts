@@ -33,14 +33,17 @@ type DecimalLike = { toString(): string } | number | string;
 export function getExpectedAmount(registration: {
   priceSnapshot: DecimalLike | null;
   passengerPriceSnapshot: DecimalLike | null;
-  hasPassenger: boolean;
+  passengerCount: number;
+  discountAmountSnapshot?: DecimalLike | null;
 }): number {
   const price = registration.priceSnapshot != null ? Number(registration.priceSnapshot.toString()) : 0;
   const passengerPrice =
-    registration.hasPassenger && registration.passengerPriceSnapshot != null
-      ? Number(registration.passengerPriceSnapshot.toString())
+    registration.passengerCount > 0 && registration.passengerPriceSnapshot != null
+      ? Number(registration.passengerPriceSnapshot.toString()) * registration.passengerCount
       : 0;
-  return price + passengerPrice;
+  const discount =
+    registration.discountAmountSnapshot != null ? Number(registration.discountAmountSnapshot.toString()) : 0;
+  return Math.max(0, price + passengerPrice - discount);
 }
 
 export type PaymentBalanceStatus = "UNPAID" | "PARTIAL" | "PAID" | "OVERPAID";

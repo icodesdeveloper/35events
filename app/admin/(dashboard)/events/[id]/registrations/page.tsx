@@ -5,7 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
 import { updatePaymentStatus, deleteRegistration } from "@/app/admin/(dashboard)/events/[id]/registrations/actions";
 import ConfirmSubmitButton from "@/components/admin/ConfirmSubmitButton";
+import Tooltip from "@/components/admin/Tooltip";
 import { getExpectedAmount, getPaymentBalance, PAYMENT_BALANCE_LABEL, type PaymentStatus } from "@/lib/payments";
+import { groupAnswersByQuestion, passengerLabel } from "@/lib/questionForms";
 
 const STATUS_OPTIONS: { value: PaymentStatus; label: string }[] = [
   { value: "PENDING_PAYMENT", label: "In afwachting" },
@@ -58,12 +60,17 @@ export default async function EventRegistrationsPage({ params }: { params: Promi
                   <div className="text-sm text-slate-500 dark:text-slate-400">
                     {registration.vehicleMake} {registration.vehicleModel}
                     {registration.vehicleType ? ` (${registration.vehicleType})` : ""}
-                    {registration.hasPassenger ? " · met passagier" : ""}
+                    {registration.passengerCount > 0
+                      ? ` · ${registration.passengerCount} passagier${registration.passengerCount > 1 ? "s" : ""}`
+                      : ""}
                   </div>
                   <div className="text-sm text-slate-500 dark:text-slate-400">
                     {registration.priceSnapshot != null ? formatPrice(registration.priceSnapshot.toString()) : "—"}
-                    {registration.hasPassenger && registration.passengerPriceSnapshot != null
-                      ? ` + ${formatPrice(registration.passengerPriceSnapshot.toString())} passagier`
+                    {registration.passengerCount > 0 && registration.passengerPriceSnapshot != null
+                      ? ` + ${registration.passengerCount} × ${formatPrice(registration.passengerPriceSnapshot.toString())} passagiers`
+                      : ""}
+                    {registration.discountAmountSnapshot != null
+                      ? ` − ${formatPrice(registration.discountAmountSnapshot.toString())} korting`
                       : ""}
                     {registration.paymentReference && expected > 0 ? (
                       <>
@@ -92,24 +99,30 @@ export default async function EventRegistrationsPage({ params }: { params: Promi
                       </button>
                     </form>
                   ))}
-                  <form action={deleteRegistration.bind(null, event.id, registration.id)}>
-                    <ConfirmSubmitButton
-                      confirmMessage={`Registratie van ${registration.participant.username} verwijderen? Dit kan niet ongedaan gemaakt worden — de deelnemer kan zich daarna wel opnieuw inschrijven voor dit event.`}
-                      className="ml-1 rounded p-1.5 text-slate-400 transition-colors hover:text-red-600 dark:hover:text-red-400"
-                      ariaLabel="Registratie verwijderen"
-                    >
-                      <FontAwesomeIcon icon={faTrash} className="h-3.5 w-3.5" />
-                    </ConfirmSubmitButton>
-                  </form>
+                  <Tooltip label="Registratie verwijderen">
+                    <form action={deleteRegistration.bind(null, event.id, registration.id)}>
+                      <ConfirmSubmitButton
+                        confirmMessage={`Registratie van ${registration.participant.username} verwijderen? Dit kan niet ongedaan gemaakt worden — de deelnemer kan zich daarna wel opnieuw inschrijven voor dit event.`}
+                        className="ml-1 rounded p-1.5 text-slate-400 transition-colors hover:text-red-600 dark:hover:text-red-400"
+                        ariaLabel="Registratie verwijderen"
+                      >
+                        <FontAwesomeIcon icon={faTrash} className="h-3.5 w-3.5" />
+                      </ConfirmSubmitButton>
+                    </form>
+                  </Tooltip>
                 </div>
               </div>
 
               {registration.answers.length > 0 ? (
                 <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1 border-t border-slate-100 pt-3 text-sm sm:grid-cols-2 dark:border-zinc-800">
-                  {registration.answers.map((answer) => (
-                    <div key={answer.id} className="text-slate-600 dark:text-slate-300">
-                      <span className="text-slate-400 dark:text-slate-500">{answer.question.label}: </span>
-                      {answer.value}
+                  {groupAnswersByQuestion(registration.answers).map(({ question, entries }) => (
+                    <div key={question.id} className="text-slate-600 dark:text-slate-300">
+                      <span className="text-slate-400 dark:text-slate-500">{question.label}: </span>
+                      {entries
+                        .map(({ passengerIndex, value }) =>
+                          question.perPassenger ? `${passengerLabel(passengerIndex)}: ${value}` : value,
+                        )
+                        .join(" · ")}
                     </div>
                   ))}
                 </div>
