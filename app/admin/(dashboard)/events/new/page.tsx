@@ -1,11 +1,40 @@
-import EventForm from "@/components/forms/EventForm";
-import { createEvent } from "@/app/admin/(dashboard)/events/actions";
+import EventEditWorkspace from "@/components/admin/EventEditWorkspace";
+import type { EventFormData } from "@/components/forms/EventFormFields";
+
+const BLANK_EVENT: EventFormData = {
+  id: "",
+  slug: "",
+  name: "",
+  description: "",
+  date: new Date(),
+  endDate: null,
+  distanceKm: null,
+  durationMinutes: null,
+  price: null,
+  passengerPrice: null,
+  maxPassengers: 0,
+  coverImagePath: null,
+  published: false,
+  registrationOpen: false,
+  registrationStartDate: null,
+  registrationEndDate: null,
+  draftData: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
 
 export default function NewEventPage() {
   return (
-    <div>
-      <h1 className="mb-6 text-xl font-semibold text-zinc-900 dark:text-white">Nieuw event</h1>
-      <EventForm action={createEvent} />
-    </div>
+    <EventEditWorkspace
+      eventId={null}
+      formId={null}
+      event={BLANK_EVENT}
+      initialQuestions={[]}
+      initialDeadline={null}
+      initialQuestionsPublished={false}
+      initialResponsesOpen={true}
+      initialEarlybirdPrices={[]}
+      initialHasDraft={false}
+    />
   );
 }

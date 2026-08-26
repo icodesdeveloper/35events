@@ -15,6 +15,7 @@ import Switch from "@/components/admin/Switch";
 import { useConfirm } from "@/components/admin/ConfirmDialogProvider";
 import {
   saveEventEdit,
+  discardEventDraft,
   type EventEditState,
   type QuestionItem,
   type EarlybirdPriceItem,
@@ -35,6 +36,11 @@ type DraftEarlybirdPrice = { clientKey: string; id?: string; deadline: string; p
 
 function toEarlybirdDraft(e: EarlybirdPriceItem): DraftEarlybirdPrice {
   return { clientKey: e.id, id: e.id, deadline: e.deadline, price: e.price };
+}
+
+function toDateInputValue(date: Date | null | undefined): string {
+  if (!date) return "";
+  return date.toISOString().slice(0, 10);
 }
 
 const TYPE_ICON: Record<QuestionType, typeof faFont> = {
@@ -62,18 +68,20 @@ export default function EventEditWorkspace({
   event,
   initialQuestions,
   initialDeadline,
-  initialPublished,
+  initialQuestionsPublished,
   initialResponsesOpen,
   initialEarlybirdPrices,
+  initialHasDraft,
 }: {
-  eventId: string;
-  formId: string;
+  eventId: string | null;
+  formId: string | null;
   event: EventFormData;
   initialQuestions: QuestionItem[];
   initialDeadline: string | null;
-  initialPublished: boolean;
+  initialQuestionsPublished: boolean;
   initialResponsesOpen: boolean;
   initialEarlybirdPrices: EarlybirdPriceItem[];
+  initialHasDraft: boolean;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -81,13 +89,16 @@ export default function EventEditWorkspace({
   const [state, formAction, pending] = useActionState<EventEditState, FormData>(boundAction, {});
 
   const [questions, setQuestions] = useState<DraftQuestion[]>(() => initialQuestions.map(toDraft));
-  const [published, setPublished] = useState(initialPublished);
+  const [questionsPublished, setQuestionsPublished] = useState(initialQuestionsPublished);
   const [responsesOpen, setResponsesOpen] = useState(initialResponsesOpen);
   const [earlybirdPrices, setEarlybirdPrices] = useState<DraftEarlybirdPrice[]>(() =>
     initialEarlybirdPrices.map(toEarlybirdDraft),
   );
+  const [hasDraft, setHasDraft] = useState(initialHasDraft);
+  const [formKey, setFormKey] = useState(0);
   const [lastSyncedSavedAt, setLastSyncedSavedAt] = useState<number | undefined>(undefined);
   const [unpublishPending, startUnpublishTransition] = useTransition();
+  const [discardPending, startDiscardTransition] = useTransition();
 
   // Resync local state with the server's response after a successful save —
   // React's documented "adjust state during render" pattern, not an effect —
@@ -96,9 +107,10 @@ export default function EventEditWorkspace({
   if (state.savedAt !== undefined && state.savedAt !== lastSyncedSavedAt) {
     setLastSyncedSavedAt(state.savedAt);
     if (state.questions) setQuestions(state.questions.map(toDraft));
-    if (state.published !== undefined) setPublished(state.published);
+    if (state.questionsPublished !== undefined) setQuestionsPublished(state.questionsPublished);
     if (state.responsesOpen !== undefined) setResponsesOpen(state.responsesOpen);
     if (state.earlybirdPrices) setEarlybirdPrices(state.earlybirdPrices.map(toEarlybirdDraft));
+    if (state.hasDraft !== undefined) setHasDraft(state.hasDraft);
   }
 
   const fieldErrors = state.fieldErrors ?? {};
@@ -132,20 +144,36 @@ export default function EventEditWorkspace({
     setEarlybirdPrices((prev) => [...prev, { clientKey: crypto.randomUUID(), deadline: "", price: "" }]);
   }
 
-  async function handleUnpublish() {
+  async function handleUnpublishQuestions() {
     const confirmed = await confirm({
       message:
         "De vragen verbergen voor deelnemers? Ze kunnen ze dan niet meer invullen totdat je opnieuw publiceert. Opslaan en (opnieuw) publiceren blijft gewoon mogelijk zonder dit te doen.",
     });
-    if (!confirmed) return;
+    if (!confirmed || !eventId || !formId) return;
     startUnpublishTransition(async () => {
       await unpublishQuestionForm(eventId, formId);
-      setPublished(false);
+      setQuestionsPublished(false);
       router.refresh();
     });
   }
 
-  const busy = pending || unpublishPending;
+  async function handleDiscardDraft() {
+    const confirmed = await confirm({
+      title: "Concept verwerpen",
+      message: "Je niet-gepubliceerde wijzigingen verwerpen? Dit kan niet ongedaan gemaakt worden.",
+      confirmLabel: "Verwerpen",
+      danger: true,
+    });
+    if (!confirmed || !eventId) return;
+    startDiscardTransition(async () => {
+      await discardEventDraft(eventId);
+      setHasDraft(false);
+      setFormKey((k) => k + 1);
+      router.refresh();
+    });
+  }
+
+  const busy = pending || unpublishPending || discardPending;
   const earlybirdPricesJson = JSON.stringify(
     earlybirdPrices.map(({ clientKey, id, deadline, price }) => ({ clientKey, id, deadline, price })),
   );
@@ -162,26 +190,15 @@ export default function EventEditWorkspace({
   );
 
   return (
-    <form action={formAction}>
+    <form key={formKey} action={formAction}>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4 dark:border-zinc-800">
-        <h1 className="text-xl font-semibold text-zinc-900 dark:text-white">{event.name} bewerken</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-semibold text-zinc-900 dark:text-white">
+            {eventId ? `${event.name} bewerken` : "Nieuw event"}
+          </h1>
+          <Switch name="published" label="Zichtbaar voor bezoekers" defaultChecked={event.published} />
+        </div>
         <div className="flex items-center gap-3">
-          {published ? (
-            <>
-              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                Gepubliceerd
-              </span>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={handleUnpublish}
-                className="text-sm font-medium text-slate-500 transition-colors hover:text-zinc-900 disabled:opacity-60 dark:text-slate-400 dark:hover:text-white"
-                title="Verbergt de vragen weer voor deelnemers totdat je opnieuw publiceert. Niet nodig om wijzigingen op te slaan of te publiceren."
-              >
-                Verbergen voor deelnemers
-              </button>
-            </>
-          ) : null}
           <button
             type="submit"
             name="intent"
@@ -199,22 +216,68 @@ export default function EventEditWorkspace({
             onClick={async (clickEvent) => {
               clickEvent.preventDefault();
               const button = clickEvent.currentTarget;
-              const message = published
-                ? "Opnieuw publiceren stuurt meteen een mail naar alle huidige registranten dat er bijkomende info nodig is. Doorgaan?"
-                : "Publiceren stuurt meteen een mail naar alle huidige registranten dat er bijkomende info nodig is. Doorgaan?";
+              const message = event.published
+                ? "Dit publiceert je wijzigingen meteen live. Doorgaan?"
+                : "Dit event wordt zichtbaar voor bezoekers. Doorgaan?";
               const confirmed = await confirm(message);
               if (confirmed) button.form?.requestSubmit(button);
             }}
             className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
           >
-            {published ? "Opnieuw publiceren" : "Publiceren"}
+            {event.published ? "Wijzigingen publiceren" : "Publiceren"}
           </button>
         </div>
       </div>
 
+      {hasDraft ? (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+          <span>Je hebt niet-gepubliceerde wijzigingen — bezoekers zien nog de huidige live versie.</span>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={handleDiscardDraft}
+            className="shrink-0 font-medium underline decoration-dotted hover:decoration-solid disabled:opacity-60"
+          >
+            Wijzigingen verwerpen
+          </button>
+        </div>
+      ) : null}
+
       {state.error ? <p className="mb-4 text-sm text-red-600 dark:text-red-400">{state.error}</p> : null}
 
       <EventFormFields event={event} errors={fieldErrors} />
+
+      <section className="mt-10 max-w-2xl">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">Registratie</h2>
+        </div>
+        <Switch
+          name="registrationOpen"
+          label="Registratie open"
+          defaultChecked={event.registrationOpen}
+          className="mb-4"
+        />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className={labelClass}>Startdatum (optioneel)</label>
+            <DatePickerField
+              name="registrationStartDate"
+              defaultValue={toDateInputValue(event.registrationStartDate)}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Einddatum (optioneel)</label>
+            <DatePickerField name="registrationEndDate" defaultValue={toDateInputValue(event.registrationEndDate)} />
+            {fieldErrors.registrationEndDate ? (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.registrationEndDate}</p>
+            ) : null}
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+          De schakelaar hierboven bepaalt altijd meteen of registreren nu kan. De datums zetten die schakelaar enkel
+          automatisch om op het gekozen moment — daarna kan je hem gewoon manueel bijsturen.
+        </p>
+      </section>
 
       <section className="mt-10 max-w-2xl">
         <div className="mb-4">
@@ -288,13 +351,54 @@ export default function EventEditWorkspace({
               &ldquo;Publiceren&rdquo; klikt.
             </p>
           </div>
-          <Link
-            href={`/admin/events/${eventId}/questions/answers`}
-            className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-slate-50 dark:border-zinc-700 dark:text-slate-300 dark:hover:bg-zinc-800"
-          >
-            Antwoorden bekijken
-          </Link>
+          {eventId ? (
+            <Link
+              href={`/admin/events/${eventId}/questions/answers`}
+              className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-slate-50 dark:border-zinc-700 dark:text-slate-300 dark:hover:bg-zinc-800"
+            >
+              Antwoorden bekijken
+            </Link>
+          ) : null}
         </div>
+
+        {eventId && formId ? (
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            {questionsPublished ? (
+              <>
+                <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                  Vragen gepubliceerd
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={handleUnpublishQuestions}
+                  className="text-sm font-medium text-slate-500 transition-colors hover:text-zinc-900 disabled:opacity-60 dark:text-slate-400 dark:hover:text-white"
+                  title="Verbergt de vragen weer voor deelnemers totdat je opnieuw publiceert."
+                >
+                  Vragen verbergen voor deelnemers
+                </button>
+              </>
+            ) : null}
+            <button
+              type="submit"
+              name="intent"
+              value="publish-questions"
+              disabled={busy}
+              onClick={async (clickEvent) => {
+                clickEvent.preventDefault();
+                const button = clickEvent.currentTarget;
+                const message = questionsPublished
+                  ? "Opnieuw publiceren stuurt meteen een mail naar alle huidige registranten dat er bijkomende info nodig is. Doorgaan?"
+                  : "Publiceren stuurt meteen een mail naar alle huidige registranten dat er bijkomende info nodig is. Doorgaan?";
+                const confirmed = await confirm(message);
+                if (confirmed) button.form?.requestSubmit(button);
+              }}
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-slate-50 disabled:opacity-60 dark:border-zinc-700 dark:text-slate-300 dark:hover:bg-zinc-800"
+            >
+              {questionsPublished ? "Vragen opnieuw publiceren" : "Vragen publiceren"}
+            </button>
+          </div>
+        ) : null}
 
         <div className="mb-4 flex flex-wrap items-end gap-6">
           <div>

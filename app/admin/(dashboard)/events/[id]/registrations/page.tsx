@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faTrash, faCar } from "@fortawesome/free-solid-svg-icons";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
 import { updatePaymentStatus, deleteRegistration } from "@/app/admin/(dashboard)/events/[id]/registrations/actions";
@@ -8,6 +8,7 @@ import ConfirmSubmitButton from "@/components/admin/ConfirmSubmitButton";
 import Tooltip from "@/components/admin/Tooltip";
 import { getExpectedAmount, getPaymentBalance, PAYMENT_BALANCE_LABEL, type PaymentStatus } from "@/lib/payments";
 import { groupAnswersByQuestion, passengerLabel } from "@/lib/questionForms";
+import ManualRegistrationForm from "@/components/admin/ManualRegistrationForm";
 
 const STATUS_OPTIONS: { value: PaymentStatus; label: string }[] = [
   { value: "PENDING_PAYMENT", label: "In afwachting" },
@@ -17,21 +18,29 @@ const STATUS_OPTIONS: { value: PaymentStatus; label: string }[] = [
 
 export default async function EventRegistrationsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const event = await prisma.event.findUnique({
-    where: { id },
-    include: {
-      registrations: {
-        include: { participant: true, answers: { include: { question: true } }, payments: true },
-        orderBy: { createdAt: "desc" },
+  const [event, allParticipants] = await Promise.all([
+    prisma.event.findUnique({
+      where: { id },
+      include: {
+        registrations: {
+          include: { participant: true, answers: { include: { question: true } }, payments: true },
+          orderBy: { createdAt: "desc" },
+        },
       },
-    },
-  });
+    }),
+    prisma.participant.findMany({ select: { id: true, username: true, email: true }, orderBy: { username: "asc" } }),
+  ]);
   if (!event) notFound();
+
+  const registeredParticipantIds = new Set(event.registrations.map((r) => r.participantId));
+  const eligibleParticipants = allParticipants.filter((p) => !registeredParticipantIds.has(p.id));
 
   return (
     <div>
       <h1 className="mb-1 text-xl font-semibold text-zinc-900 dark:text-white">{event.name}</h1>
       <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">Registraties</p>
+
+      <ManualRegistrationForm eventId={event.id} participants={eligibleParticipants} maxPassengers={event.maxPassengers} />
 
       {event.registrations.length === 0 ? (
         <p className="text-slate-500 dark:text-slate-400">Nog geen registraties voor dit event.</p>
@@ -47,15 +56,26 @@ export default async function EventRegistrationsPage({ params }: { params: Promi
               className="rounded-xl border border-slate-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
             >
               <div className="flex flex-wrap items-center gap-4">
-                {/* eslint-disable-next-line @next/next/no-img-element -- served via app/api/media */}
-                <img
-                  src={`/api/media/${registration.vehiclePhotoPath}`}
-                  alt=""
-                  className="h-16 w-16 rounded-lg object-cover"
-                />
+                {registration.vehiclePhotoPath ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- served via app/api/media
+                  <img
+                    src={`/api/media/${registration.vehiclePhotoPath}`}
+                    alt=""
+                    className="h-16 w-16 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400 dark:bg-zinc-800 dark:text-slate-500">
+                    <FontAwesomeIcon icon={faCar} className="h-5 w-5" />
+                  </div>
+                )}
                 <div className="min-w-48 flex-1">
-                  <div className="font-medium text-zinc-900 dark:text-white">
+                  <div className="flex items-center gap-2 font-medium text-zinc-900 dark:text-white">
                     {registration.participant.username} · {registration.participant.email}
+                    {registration.addedManually ? (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-zinc-800 dark:text-slate-400">
+                        Manueel toegevoegd
+                      </span>
+                    ) : null}
                   </div>
                   <div className="text-sm text-slate-500 dark:text-slate-400">
                     {registration.vehicleMake} {registration.vehicleModel}

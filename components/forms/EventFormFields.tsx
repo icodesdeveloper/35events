@@ -1,7 +1,6 @@
 import type { Event } from "@prisma/client";
 import FileDropzone from "@/components/admin/FileDropzone";
 import DatePickerField from "@/components/admin/DatePickerField";
-import Switch from "@/components/admin/Switch";
 import RichTextEditor from "@/components/admin/RichTextEditor";
 
 // Prisma's Decimal is a class instance, not a plain object — it can't cross
@@ -159,11 +158,6 @@ export default function EventFormFields({
           Ideale afmetingen: minstens 1920 × 1080 px, liggend formaat — de foto wordt zowel breed (als banner) als
           rechtopstaand (4:5, als kaart) uitgesneden.
         </p>
-      </div>
-
-      <div className="flex gap-8">
-        <Switch name="published" label="Gepubliceerd" defaultChecked={event?.published ?? false} />
-        <Switch name="registrationOpen" label="Registratie open" defaultChecked={event?.registrationOpen ?? false} />
       </div>
     </div>
   );

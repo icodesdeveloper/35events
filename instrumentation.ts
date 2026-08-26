@@ -9,6 +9,7 @@ const FIVE_MINUTES_MS = 5 * 60 * 1000;
 const globalForScheduler = globalThis as unknown as {
   extraInfoSchedulerStarted?: boolean;
   campaignSchedulerStarted?: boolean;
+  registrationWindowSchedulerStarted?: boolean;
 };
 
 export async function register() {
@@ -39,6 +40,19 @@ export async function register() {
     const tick = () => {
       runScheduledCampaignsCheck().catch((error) => {
         console.error("[scheduledCampaigns] check failed:", error);
+      });
+    };
+    tick();
+    setInterval(tick, FIVE_MINUTES_MS);
+  }
+
+  if (!globalForScheduler.registrationWindowSchedulerStarted) {
+    globalForScheduler.registrationWindowSchedulerStarted = true;
+
+    const { runRegistrationWindowCheck } = await import("@/lib/notifications/registrationWindow");
+    const tick = () => {
+      runRegistrationWindowCheck().catch((error) => {
+        console.error("[registrationWindow] check failed:", error);
       });
     };
     tick();

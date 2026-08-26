@@ -23,7 +23,9 @@ export async function deleteParticipant(participantId: string) {
   });
 
   await prisma.participant.delete({ where: { id: participantId } });
-  await Promise.all(registrations.map((r) => storage.delete(r.vehiclePhotoPath)));
+  await Promise.all(
+    registrations.filter((r) => r.vehiclePhotoPath).map((r) => storage.delete(r.vehiclePhotoPath!)),
+  );
 
   revalidatePath("/admin/participants");
 }

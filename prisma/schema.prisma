@@ -43,22 +43,29 @@ model ParticipantMagicLinkToken {
 }
 
 model Event {
-  id               String    @id @default(cuid())
-  slug             String    @unique
-  name             String
-  description      String
-  date             DateTime
-  endDate          DateTime?
-  distanceKm       Float?
-  durationMinutes  Int?
-  price            Decimal?
-  passengerPrice   Decimal?
-  maxPassengers    Int       @default(0)
-  coverImagePath   String?
-  published        Boolean   @default(false)
-  registrationOpen Boolean   @default(false)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id                    String    @id @default(cuid())
+  slug                  String    @unique
+  name                  String
+  description           String
+  date                  DateTime
+  endDate               DateTime?
+  distanceKm            Float?
+  durationMinutes       Int?
+  price                 Decimal?
+  passengerPrice        Decimal?
+  maxPassengers         Int       @default(0)
+  coverImagePath        String?
+  published             Boolean   @default(false)
+  registrationOpen      Boolean   @default(false)
+  registrationStartDate DateTime?
+  registrationEndDate   DateTime?
+  // Pending, unpublished snapshot of the core content fields (everything in
+  // components/forms/EventFormFields.tsx, plus the two registration-window
+  // dates above) — only used once the event has been published at least
+  // once. See app/admin/(dashboard)/events/[id]/edit/actions.ts.
+  draftData             Json?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   media           EventMedia[]
   registrations   Registration[]
@@ -157,7 +164,11 @@ model Registration {
   vehicleMake             String
   vehicleModel            String
   vehicleType             String?
-  vehiclePhotoPath        String
+  vehiclePhotoPath        String?
+  // True for registrations the admin created on someone's behalf (see
+  // adminCreateRegistration in the registrations actions) — these never go
+  // through the public form, so there's no vehicle photo.
+  addedManually           Boolean   @default(false)
   passengerCount          Int       @default(0)
   priceSnapshot           Decimal?
   passengerPriceSnapshot  Decimal?
