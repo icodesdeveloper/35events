@@ -20,7 +20,7 @@ export async function notifyRegistrantsOfPublish(eventId: string): Promise<void>
   if (!event?.questionForm) return;
 
   for (const registration of event.registrations) {
-    const { subject, text, html } = extraInfoRequestEmail(
+    const { subject, text, html } = await extraInfoRequestEmail(
       event.name,
       extraInfoUrl(registration.id),
       event.questionForm.deadline,
@@ -70,7 +70,7 @@ export async function runExtraInfoReminderCheck(): Promise<void> {
       const complete = await isRegistrationComplete(registration.id, requiredQuestionIds);
       if (complete) continue;
 
-      const { subject, text, html } = extraInfoReminderEmail(
+      const { subject, text, html } = await extraInfoReminderEmail(
         form.event.name,
         extraInfoUrl(registration.id),
         form.deadline,

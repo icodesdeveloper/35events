@@ -35,6 +35,6 @@ export async function notifyPaymentConfirmed(registrationId: string): Promise<vo
       : [];
   const answersComplete = isRegistrationComplete(questions, registration.passengerCount, registration.answers);
 
-  const { subject, text, html } = paymentConfirmedEmail(registration.event.name, `${SITE_URL}/account`, answersComplete);
+  const { subject, text, html } = await paymentConfirmedEmail(registration.event.name, `${SITE_URL}/account`, answersComplete);
   await sendMail({ to: registration.participant.email, subject, text, html }).catch(() => {});
 }

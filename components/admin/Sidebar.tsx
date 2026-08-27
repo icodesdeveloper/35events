@@ -11,6 +11,7 @@ import {
   faTags,
   faPaperPlane,
   faUserShield,
+  faGear,
   faArrowRightFromBracket,
 } from "@fortawesome/free-solid-svg-icons";
 import { adminSignOut } from "@/lib/auth/actions";
@@ -23,9 +24,10 @@ const NAV_ITEMS = [
   { href: "/admin/discount-codes", label: "Kortingscodes", icon: faTags, exact: false },
   { href: "/admin/communications", label: "Communicatie", icon: faPaperPlane, exact: false },
   { href: "/admin/admins", label: "Admins", icon: faUserShield, exact: false },
+  { href: "/admin/settings", label: "Instellingen", icon: faGear, exact: false },
 ];
 
-export default function Sidebar({ open }: { open: boolean }) {
+export default function Sidebar({ open, logoPath }: { open: boolean; logoPath: string | null }) {
   const pathname = usePathname();
 
   return (
@@ -36,9 +38,14 @@ export default function Sidebar({ open }: { open: boolean }) {
       }`}
     >
       <Link href="/admin" className="mt-2 mb-4 flex min-h-16 items-center px-6 transition-opacity hover:opacity-80">
-        <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-sm font-bold text-white shadow-sm dark:bg-white dark:text-zinc-900">
-          35
-        </div>
+        {logoPath ? (
+          // eslint-disable-next-line @next/next/no-img-element -- served via app/api/media
+          <img src={`/api/media/${logoPath}`} alt="35events" className="mr-3 h-8 w-auto" />
+        ) : (
+          <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-sm font-bold text-white shadow-sm dark:bg-white dark:text-zinc-900">
+            35
+          </div>
+        )}
         <span className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-white">
           35events admin
         </span>

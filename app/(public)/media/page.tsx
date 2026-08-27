@@ -1,9 +1,12 @@
-import { getPastEvents } from "@/lib/events";
+import { getEventsVisibleUnderMedia, getMediaViewer } from "@/lib/media";
+import { auth as participantAuth } from "@/lib/auth/participant";
 import FadeIn from "@/components/public/FadeIn";
 import EventCard from "@/components/public/EventCard";
 
 export default async function MediaPage() {
-  const pastEvents = await getPastEvents();
+  const session = await participantAuth();
+  const viewer = await getMediaViewer(session?.user?.participantId ?? null);
+  const pastEvents = await getEventsVisibleUnderMedia(viewer);
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-16 md:px-8">

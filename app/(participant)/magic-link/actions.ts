@@ -42,7 +42,7 @@ export async function requestMagicLink(
   });
 
   const url = `${SITE_URL}/magic-link/verify?email=${encodeURIComponent(normalizedEmail)}&token=${token}`;
-  const { subject, text, html } = magicLinkEmail(url);
+  const { subject, text, html } = await magicLinkEmail(url);
   await sendMail({ to: normalizedEmail, subject, text, html });
 
   return { sent: true };

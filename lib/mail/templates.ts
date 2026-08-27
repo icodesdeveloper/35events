@@ -15,13 +15,13 @@ function htmlToPlainText(html: string): string {
     .trim();
 }
 
-export function campaignEmail(subject: string, bodyHtml: string) {
-  const { html } = renderEmailLayout({ preheader: subject, bodyHtml });
+export async function campaignEmail(subject: string, bodyHtml: string) {
+  const { html } = await renderEmailLayout({ preheader: subject, bodyHtml });
   return { subject, text: htmlToPlainText(bodyHtml), html };
 }
 
-export function magicLinkEmail(url: string) {
-  const { html } = renderEmailLayout({
+export async function magicLinkEmail(url: string) {
+  const { html } = await renderEmailLayout({
     preheader: "Je inloglink voor 35events",
     bodyHtml: `
       <p style="margin:0 0 16px;">Klik op de knop hieronder om in te loggen bij 35events.</p>
@@ -42,9 +42,9 @@ function formatDeadline(deadline: Date | null): string {
   return new Intl.DateTimeFormat("nl-BE", { day: "numeric", month: "long", year: "numeric" }).format(deadline);
 }
 
-export function extraInfoRequestEmail(eventName: string, url: string, deadline: Date | null) {
+export async function extraInfoRequestEmail(eventName: string, url: string, deadline: Date | null) {
   const deadlineText = deadline ? ` Gelieve dit in te vullen vóór ${formatDeadline(deadline)}.` : "";
-  const { html } = renderEmailLayout({
+  const { html } = await renderEmailLayout({
     preheader: `Bijkomende info nodig voor ${eventName}`,
     bodyHtml: `
       <p style="margin:0 0 16px;">We hebben nog bijkomende informatie nodig voor je registratie voor <strong>${eventName}</strong>.${deadlineText}</p>
@@ -58,9 +58,9 @@ export function extraInfoRequestEmail(eventName: string, url: string, deadline: 
   };
 }
 
-export function extraInfoReminderEmail(eventName: string, url: string, deadline: Date | null) {
+export async function extraInfoReminderEmail(eventName: string, url: string, deadline: Date | null) {
   const deadlineText = deadline ? ` vóór ${formatDeadline(deadline)}` : "";
-  const { html } = renderEmailLayout({
+  const { html } = await renderEmailLayout({
     preheader: `Herinnering: bijkomende info nodig voor ${eventName}`,
     bodyHtml: `
       <p style="margin:0 0 16px;">Herinnering: gelieve de bijkomende informatie voor <strong>${eventName}</strong> in te vullen${deadlineText}.</p>
@@ -74,14 +74,19 @@ export function extraInfoReminderEmail(eventName: string, url: string, deadline:
   };
 }
 
-function bankTransferInstructions(paymentReference: string, expectedAmount: number): { text: string; html: string } {
+export type BankAccountInfo = { iban: string | null; accountName: string | null };
+
+function bankTransferInstructions(
+  paymentReference: string,
+  expectedAmount: number,
+  bankAccount: BankAccountInfo,
+): { text: string; html: string } {
   if (expectedAmount <= 0) {
     return { text: "Deze deelname is gratis.", html: "<p style=\"margin:0 0 16px;\">Deze deelname is gratis.</p>" };
   }
 
   const priceLine = `${expectedAmount.toFixed(2).replace(".", ",")} euro`;
-  const iban = process.env.BANK_ACCOUNT_IBAN;
-  const accountName = process.env.BANK_ACCOUNT_NAME;
+  const { iban, accountName } = bankAccount;
 
   if (!iban) {
     return {
@@ -97,9 +102,9 @@ function bankTransferInstructions(paymentReference: string, expectedAmount: numb
   };
 }
 
-export function contactNotificationEmail(name: string, email: string, message: string) {
+export async function contactNotificationEmail(name: string, email: string, message: string) {
   const escapedMessage = message.replace(/\n/g, "<br>");
-  const { html } = renderEmailLayout({
+  const { html } = await renderEmailLayout({
     preheader: `Nieuwe contactaanvraag van ${name}`,
     bodyHtml: `
       <p style="margin:0 0 16px;">Nieuwe contactaanvraag via de website.</p>
@@ -114,8 +119,8 @@ export function contactNotificationEmail(name: string, email: string, message: s
   };
 }
 
-export function contactConfirmationEmail(name: string) {
-  const { html } = renderEmailLayout({
+export async function contactConfirmationEmail(name: string) {
+  const { html } = await renderEmailLayout({
     preheader: "Je contactaanvraag is ontvangen",
     bodyHtml: `
       <p style="margin:0 0 16px;">Hey ${name},</p>
@@ -130,14 +135,15 @@ export function contactConfirmationEmail(name: string) {
   };
 }
 
-export function registrationConfirmationEmail(
+export async function registrationConfirmationEmail(
   eventName: string,
   accountUrl: string,
   paymentReference: string,
   expectedAmount: number,
+  bankAccount: BankAccountInfo,
 ) {
-  const instructions = bankTransferInstructions(paymentReference, expectedAmount);
-  const { html } = renderEmailLayout({
+  const instructions = bankTransferInstructions(paymentReference, expectedAmount, bankAccount);
+  const { html } = await renderEmailLayout({
     preheader: `Registratie ontvangen voor ${eventName}`,
     bodyHtml: `
       <p style="margin:0 0 16px;">Je registratie voor <strong>${eventName}</strong> is ontvangen.</p>
@@ -152,14 +158,14 @@ export function registrationConfirmationEmail(
   };
 }
 
-export function paymentConfirmedEmail(eventName: string, accountUrl: string, answersComplete: boolean) {
+export async function paymentConfirmedEmail(eventName: string, accountUrl: string, answersComplete: boolean) {
   const pendingLine = answersComplete
     ? ""
     : " Er staan trouwens nog bijkomende vragen open voor deze registratie — gelieve die ook nog in te vullen.";
   const pendingHtml = answersComplete
     ? ""
     : `<p style="margin:0 0 16px;">Er staan trouwens nog <strong>bijkomende vragen</strong> open voor deze registratie — gelieve die ook nog in te vullen.</p>`;
-  const { html } = renderEmailLayout({
+  const { html } = await renderEmailLayout({
     preheader: `Betaling ontvangen voor ${eventName}`,
     bodyHtml: `
       <p style="margin:0 0 16px;">Goed nieuws! Je betaling voor <strong>${eventName}</strong> is bevestigd, je deelname is helemaal in orde.</p>

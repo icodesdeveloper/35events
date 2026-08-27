@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/admin";
 import { prisma } from "@/lib/prisma";
+import { getSettings } from "@/lib/settings";
 import AdminShell from "@/components/admin/AdminShell";
 
 export default async function AdminDashboardLayout({ children }: { children: ReactNode }) {
@@ -12,9 +13,10 @@ export default async function AdminDashboardLayout({ children }: { children: Rea
 
   const userLabel = session?.user?.email ?? session?.user?.name ?? "";
   const pendingCount = await prisma.registration.count({ where: { paymentStatus: "PENDING_PAYMENT" } });
+  const settings = await getSettings();
 
   return (
-    <AdminShell userLabel={userLabel} pendingCount={pendingCount}>
+    <AdminShell userLabel={userLabel} pendingCount={pendingCount} logoPath={settings.logoPath}>
       {children}
     </AdminShell>
   );

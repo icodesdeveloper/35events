@@ -9,6 +9,7 @@ import MediaGallery from "@/components/public/MediaGallery";
 import CornerBrackets from "@/components/public/CornerBrackets";
 import { auth as participantAuth } from "@/lib/auth/participant";
 import { prisma } from "@/lib/prisma";
+import { getMediaViewer, getVisibleSections } from "@/lib/media";
 
 const PAYMENT_STATUS_LABEL: Record<string, string> = {
   PENDING_PAYMENT: "Betaling in afwachting",
@@ -31,6 +32,8 @@ export default async function EventDetailPage({
         where: { eventId_participantId: { eventId: event.id, participantId: session.user.participantId } },
       })
     : null;
+  const viewer = await getMediaViewer(session?.user?.participantId ?? null);
+  const visibleSections = getVisibleSections(event, viewer);
 
   const hasPrice = event.price != null || event.earlybirdPrices.length > 0;
   const activeEarlybirdTier = getActiveEarlybirdTier(event);
@@ -107,7 +110,7 @@ export default async function EventDetailPage({
           dangerouslySetInnerHTML={{ __html: event.description }}
         />
 
-        <MediaGallery media={event.media} />
+        <MediaGallery sections={visibleSections} />
       </div>
     </article>
   );

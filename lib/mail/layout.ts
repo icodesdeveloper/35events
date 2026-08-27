@@ -6,6 +6,9 @@
 // clients render consistently — a <div>-based layout with a <style> block
 // gets silently stripped in enough clients to not be worth the risk.
 
+import { getSettings } from "@/lib/settings";
+import { SITE_URL } from "@/lib/site";
+
 const COLORS = {
   pageBg: "#09090b",
   cardBg: "#111113",
@@ -38,11 +41,27 @@ function styleContentLinks(html: string): string {
   });
 }
 
-export function renderEmailLayout({ preheader, bodyHtml }: { preheader?: string; bodyHtml: string }): {
-  html: string;
-} {
+export async function renderEmailLayout({
+  preheader,
+  bodyHtml,
+}: {
+  preheader?: string;
+  bodyHtml: string;
+}): Promise<{ html: string }> {
   const year = new Date().getFullYear();
   const styledBodyHtml = styleContentLinks(bodyHtml);
+
+  const settings = await getSettings();
+  const logoMarkup = settings.logoPath
+    ? `<tr><td><img src="${SITE_URL}/api/media/${settings.logoPath}" alt="35events" height="32" style="height:32px;width:auto;display:block;" /></td></tr>`
+    : `<tr>
+        <td style="border:1px solid ${COLORS.accent};width:32px;height:32px;text-align:center;vertical-align:middle;font-family:${FONT_STACK};font-weight:700;font-size:14px;color:${COLORS.accent};">
+          35
+        </td>
+        <td style="padding-left:10px;font-family:${FONT_STACK};font-weight:600;font-size:16px;color:${COLORS.text};">
+          35events
+        </td>
+      </tr>`;
 
   const html = `<!doctype html>
 <html lang="nl">
@@ -62,14 +81,7 @@ export function renderEmailLayout({ preheader, bodyHtml }: { preheader?: string;
             <tr>
               <td style="padding-bottom:24px;">
                 <table role="presentation" cellpadding="0" cellspacing="0">
-                  <tr>
-                    <td style="border:1px solid ${COLORS.accent};width:32px;height:32px;text-align:center;vertical-align:middle;font-family:${FONT_STACK};font-weight:700;font-size:14px;color:${COLORS.accent};">
-                      35
-                    </td>
-                    <td style="padding-left:10px;font-family:${FONT_STACK};font-weight:600;font-size:16px;color:${COLORS.text};">
-                      35events
-                    </td>
-                  </tr>
+                  ${logoMarkup}
                 </table>
               </td>
             </tr>

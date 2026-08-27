@@ -28,8 +28,8 @@ export async function submitContact(
 
   const { name, email, message } = result.data;
 
-  const notification = contactNotificationEmail(name, email, message);
-  const confirmation = contactConfirmationEmail(name);
+  const notification = await contactNotificationEmail(name, email, message);
+  const confirmation = await contactConfirmationEmail(name);
 
   try {
     await sendMail({ to: CONTACT_INBOX, ...notification });

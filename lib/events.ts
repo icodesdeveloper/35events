@@ -1,16 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
-// "Past" vs "upcoming" is derived from endDate ?? date — no separate status
-// field to keep in sync.
-function pastEventWhere(): Prisma.EventWhereInput {
-  const now = new Date();
-  return {
-    published: true,
-    OR: [{ endDate: { lt: now } }, { endDate: null, date: { lt: now } }],
-  };
-}
-
+// "Upcoming" is derived from endDate ?? date — no separate status field to
+// keep in sync.
 function upcomingEventWhere(): Prisma.EventWhereInput {
   const now = new Date();
   return {
@@ -27,18 +19,13 @@ export function getUpcomingEvents() {
   });
 }
 
-export function getPastEvents() {
-  return prisma.event.findMany({
-    where: pastEventWhere(),
-    orderBy: { date: "desc" },
-    include: { earlybirdPrices: true },
-  });
-}
-
 export function getEventBySlug(slug: string) {
   return prisma.event.findFirst({
     where: { slug, published: true },
-    include: { media: { orderBy: { order: "asc" } }, earlybirdPrices: true },
+    include: {
+      mediaSections: { orderBy: { order: "asc" }, include: { media: { orderBy: { order: "asc" } } } },
+      earlybirdPrices: true,
+    },
   });
 }
 

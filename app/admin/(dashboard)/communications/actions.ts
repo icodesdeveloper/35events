@@ -101,7 +101,7 @@ export async function sendResolvedCampaign(
   bodyHtml: string,
   recipients: CampaignRecipient[],
 ): Promise<void> {
-  const { subject: mailSubject, text, html } = campaignEmail(subject, bodyHtml);
+  const { subject: mailSubject, text, html } = await campaignEmail(subject, bodyHtml);
   await Promise.all(
     recipients.map((recipient) => sendMail({ to: recipient.email, subject: mailSubject, text, html }).catch(() => {})),
   );

@@ -10,6 +10,7 @@ const globalForScheduler = globalThis as unknown as {
   extraInfoSchedulerStarted?: boolean;
   campaignSchedulerStarted?: boolean;
   registrationWindowSchedulerStarted?: boolean;
+  mediaVisibilitySchedulerStarted?: boolean;
 };
 
 export async function register() {
@@ -53,6 +54,19 @@ export async function register() {
     const tick = () => {
       runRegistrationWindowCheck().catch((error) => {
         console.error("[registrationWindow] check failed:", error);
+      });
+    };
+    tick();
+    setInterval(tick, FIVE_MINUTES_MS);
+  }
+
+  if (!globalForScheduler.mediaVisibilitySchedulerStarted) {
+    globalForScheduler.mediaVisibilitySchedulerStarted = true;
+
+    const { runMediaVisibilityCheck } = await import("@/lib/notifications/mediaVisibility");
+    const tick = () => {
+      runMediaVisibilityCheck().catch((error) => {
+        console.error("[mediaVisibility] check failed:", error);
       });
     };
     tick();

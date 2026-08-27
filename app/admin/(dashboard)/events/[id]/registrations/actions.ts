@@ -9,6 +9,7 @@ import { notifyPaymentConfirmed } from "@/lib/notifications/payment";
 import { sendMail } from "@/lib/mail/transporter";
 import { registrationConfirmationEmail } from "@/lib/mail/templates";
 import { SITE_URL } from "@/lib/site";
+import { getSettings } from "@/lib/settings";
 
 export async function updatePaymentStatus(eventId: string, registrationId: string, status: PaymentStatus) {
   const current = await prisma.registration.findUnique({
@@ -81,11 +82,13 @@ export async function adminCreateRegistration(
       await notifyPaymentConfirmed(registration.id);
     } else {
       const expectedAmount = getExpectedAmount(registration);
-      const { subject, text, html } = registrationConfirmationEmail(
+      const settings = await getSettings();
+      const { subject, text, html } = await registrationConfirmationEmail(
         event.name,
         `${SITE_URL}/account`,
         paymentReference,
         expectedAmount,
+        { iban: settings.bankAccountIban, accountName: settings.bankAccountName },
       );
       await sendMail({ to: participant.email, subject, text, html }).catch(() => {});
     }

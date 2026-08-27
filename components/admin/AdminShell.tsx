@@ -8,10 +8,12 @@ import ConfirmDialogProvider from "@/components/admin/ConfirmDialogProvider";
 export default function AdminShell({
   userLabel,
   pendingCount,
+  logoPath,
   children,
 }: {
   userLabel: string;
   pendingCount: number;
+  logoPath: string | null;
   children: ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -32,7 +34,7 @@ export default function AdminShell({
           />
         ) : null}
 
-        <Sidebar open={sidebarOpen} />
+        <Sidebar open={sidebarOpen} logoPath={logoPath} />
 
         <div className="flex min-h-full flex-1 flex-col">
           <Header

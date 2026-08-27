@@ -15,6 +15,7 @@ const MAX_VEHICLE_PHOTO_BYTES = 1_000_000;
 import { sendMail } from "@/lib/mail/transporter";
 import { registrationConfirmationEmail } from "@/lib/mail/templates";
 import { SITE_URL } from "@/lib/site";
+import { getSettings } from "@/lib/settings";
 
 export type RegistrationFormState = { error?: string; fieldErrors?: Record<string, string> };
 
@@ -178,11 +179,13 @@ export async function submitRegistration(
 
   if (session.user.email) {
     const expectedAmount = getExpectedAmount(registration);
-    const { subject, text, html } = registrationConfirmationEmail(
+    const settings = await getSettings();
+    const { subject, text, html } = await registrationConfirmationEmail(
       event.name,
       `${SITE_URL}/account`,
       paymentReference,
       expectedAmount,
+      { iban: settings.bankAccountIban, accountName: settings.bankAccountName },
     );
     await sendMail({ to: session.user.email, subject, text, html }).catch(() => {});
   }

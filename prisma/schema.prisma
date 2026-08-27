@@ -7,6 +7,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Singleton row (fixed id) for site-wide admin-configurable settings —
+// currently just the bank account shown in payment instructions. See
+// lib/settings.ts.
+model Settings {
+  id              String  @id @default("singleton")
+  bankAccountIban String?
+  bankAccountName String?
+  // Shown in the public header, admin sidebar, and email header (see
+  // lib/mail/layout.ts) in place of the plain "35" mark once set.
+  logoPath        String?
+}
+
 model AdminAllowlist {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -64,16 +76,64 @@ model Event {
   // dates above) — only used once the event has been published at least
   // once. See app/admin/(dashboard)/events/[id]/edit/actions.ts.
   draftData             Json?
+  // Admin-controlled media visibility — replaces the old "past events just
+  // automatically show under /media" behavior (see lib/events.ts history).
+  // mediaVisibility: MediaVisibility (PUBLIC | PARTICIPANTS_ONLY | HIDDEN) —
+  // the default that EventMediaSection rows inherit. mediaVisibleFromDate/
+  // mediaVisibleFromTarget are an optional one-time scheduled nudge (same
+  // edge-triggered, non-overlapping semantics as registrationStartDate/
+  // registrationEndDate — see lib/notifications/registrationWindow.ts and
+  // its media counterpart lib/notifications/mediaVisibility.ts): once that
+  // date has passed, mediaVisibility flips from HIDDEN to the chosen target
+  // exactly once, and never fights a manual change afterward.
+  mediaVisibility        String    @default("HIDDEN")
+  mediaVisibleFromDate   DateTime?
+  mediaVisibleFromTarget String?
+  // DownloadPermission (EVERYONE | PARTICIPANTS_ONLY | NOBODY) — default
+  // that EventMediaSection rows inherit. Always bounded by visibility: see
+  // lib/media.ts.
+  downloadPermission     String    @default("NOBODY")
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
   media           EventMedia[]
+  mediaSections   EventMediaSection[]
   registrations   Registration[]
   questionForm    EventQuestionForm?
   discountCodes   DiscountCode[]
   earlybirdPrices EarlybirdPrice[]
 
   @@index([date])
+}
+
+// A named, independently-visible group of EventMedia within an event (e.g.
+// "Aftermovie", "Sfeerfoto's") — see lib/media.ts for how effective
+// visibility/download rights are resolved and app/admin/(dashboard)/events/
+// [id]/media for how they're managed.
+model EventMediaSection {
+  id          String  @id @default(cuid())
+  eventId     String
+  title       String
+  order       Int     @default(0)
+  isHighlight Boolean @default(false)
+
+  // Visibility and download rights are two fully independent dimensions —
+  // each with its own inherit-from-event switch, deliberately not bundled
+  // into one "override" toggle (a section may be visible to participants
+  // while still downloadable by nobody).
+  inheritVisibility  Boolean   @default(true)
+  visibility         String    @default("HIDDEN")
+  visibleFromDate    DateTime?
+  visibleFromTarget  String?
+  inheritDownload    Boolean   @default(true)
+  downloadPermission String    @default("NOBODY")
+
+  createdAt DateTime @default(now())
+
+  event Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  media EventMedia[]
+
+  @@index([eventId, order])
 }
 
 // A price tier that applies while its deadline hasn't passed yet — see
@@ -146,15 +206,18 @@ model EventQuestionAnswer {
 model EventMedia {
   id        String   @id @default(cuid())
   eventId   String
+  sectionId String
   type      String // EventMediaType: PHOTO | VIDEO
   filePath  String
   caption   String?
   order     Int      @default(0)
   createdAt DateTime @default(now())
 
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event   Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  section EventMediaSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
 
   @@index([eventId, order])
+  @@index([sectionId, order])
 }
 
 model Registration {

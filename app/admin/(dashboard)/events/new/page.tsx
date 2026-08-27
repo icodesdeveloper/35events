@@ -19,6 +19,10 @@ const BLANK_EVENT: EventFormData = {
   registrationStartDate: null,
   registrationEndDate: null,
   draftData: null,
+  mediaVisibility: "HIDDEN",
+  mediaVisibleFromDate: null,
+  mediaVisibleFromTarget: null,
+  downloadPermission: "NOBODY",
   createdAt: new Date(),
   updatedAt: new Date(),
 };
