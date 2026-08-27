@@ -1,10 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark, faChevronLeft, faChevronRight, faDownload } from "@fortawesome/free-solid-svg-icons";
 import type { EventMedia } from "@prisma/client";
 import VideoPlayer from "@/components/public/VideoPlayer";
+
+const SLIDE_VARIANTS = {
+  enter: (direction: number) => ({ x: direction * 60, opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (direction: number) => ({ x: direction * -60, opacity: 0 }),
+};
 
 export default function MediaLightbox({
   media,
@@ -18,13 +25,27 @@ export default function MediaLightbox({
   onClose: () => void;
 }) {
   const [index, setIndex] = useState(initialIndex);
+  const [direction, setDirection] = useState(0);
+  const shouldReduceMotion = useReducedMotion();
   const item = media[index];
+
+  // Functional updates so these never close over a stale `index` — needed
+  // since the keydown listener below is bound once and must stay correct
+  // across every subsequent index change without re-binding each time.
+  function goPrev() {
+    setDirection(-1);
+    setIndex((i) => (i - 1 + media.length) % media.length);
+  }
+  function goNext() {
+    setDirection(1);
+    setIndex((i) => (i + 1) % media.length);
+  }
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
-      if (event.key === "ArrowLeft") setIndex((i) => (i - 1 + media.length) % media.length);
-      if (event.key === "ArrowRight") setIndex((i) => (i + 1) % media.length);
+      if (event.key === "ArrowLeft") goPrev();
+      if (event.key === "ArrowRight") goNext();
     }
     document.addEventListener("keydown", onKeyDown);
     document.body.style.overflow = "hidden";
@@ -32,6 +53,7 @@ export default function MediaLightbox({
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = "";
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- goPrev/goNext are stable in effect: they only use functional setState, no captured index
   }, [media.length, onClose]);
 
   if (!item) return null;
@@ -60,11 +82,11 @@ export default function MediaLightbox({
         </button>
       </div>
 
-      <div className="relative flex flex-1 items-center justify-center px-4 pb-4">
+      <div className="relative flex min-h-0 flex-1 items-center justify-center px-4 pb-4">
         {media.length > 1 ? (
           <button
             type="button"
-            onClick={() => setIndex((i) => (i - 1 + media.length) % media.length)}
+            onClick={goPrev}
             className="absolute left-2 z-10 rounded-full p-3 text-white/70 transition-colors hover:bg-white/10 hover:text-white md:left-6"
             aria-label="Vorige"
           >
@@ -72,17 +94,36 @@ export default function MediaLightbox({
           </button>
         ) : null}
 
-        {item.type === "VIDEO" ? (
-          <VideoPlayer key={item.id} src={src} className="max-h-full max-w-full" />
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element -- served via app/api/media
-          <img src={src} alt={item.caption ?? ""} className="max-h-full max-w-full object-contain" />
-        )}
+        <div className="relative h-full w-full overflow-hidden">
+          <AnimatePresence initial={false} custom={direction}>
+            <motion.div
+              key={item.id}
+              custom={direction}
+              variants={shouldReduceMotion ? undefined : SLIDE_VARIANTS}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.28, ease: "easeOut" }}
+              className="absolute inset-0 flex items-center justify-center"
+            >
+              {item.type === "VIDEO" ? (
+                <VideoPlayer key={item.id} src={src} className="max-h-full max-w-full min-h-0 min-w-0" />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element -- served via app/api/media
+                <img
+                  src={src}
+                  alt={item.caption ?? ""}
+                  className="max-h-full max-w-full min-h-0 min-w-0 object-contain"
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
         {media.length > 1 ? (
           <button
             type="button"
-            onClick={() => setIndex((i) => (i + 1) % media.length)}
+            onClick={goNext}
             className="absolute right-2 z-10 rounded-full p-3 text-white/70 transition-colors hover:bg-white/10 hover:text-white md:right-6"
             aria-label="Volgende"
           >

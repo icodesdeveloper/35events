@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { createSection } from "@/app/admin/(dashboard)/events/[id]/media/actions";
 import EventMediaSettingsForm from "@/components/admin/EventMediaSettingsForm";
-import MediaSectionCard from "@/components/admin/MediaSectionCard";
+import SortableSectionList from "@/components/admin/SortableSectionList";
 import { fieldClass } from "@/components/forms/EventFormFields";
 
 export default async function EventMediaPage({ params }: { params: Promise<{ id: string }> }) {
@@ -29,15 +29,7 @@ export default async function EventMediaPage({ params }: { params: Promise<{ id:
       {event.mediaSections.length === 0 ? (
         <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">Nog geen secties voor dit event.</p>
       ) : (
-        event.mediaSections.map((section, index) => (
-          <MediaSectionCard
-            key={section.id}
-            eventId={event.id}
-            section={section}
-            isFirst={index === 0}
-            isLast={index === event.mediaSections.length - 1}
-          />
-        ))
+        <SortableSectionList eventId={event.id} sections={event.mediaSections} />
       )}
 
       <form

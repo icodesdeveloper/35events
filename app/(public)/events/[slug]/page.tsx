@@ -1,11 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleCheck } from "@fortawesome/free-solid-svg-icons";
+import { faCircleCheck, faImages, faArrowRight } from "@fortawesome/free-solid-svg-icons";
 import { getEventBySlug } from "@/lib/events";
 import { formatDistance, formatDuration, formatEventDate, formatPrice } from "@/lib/format";
 import { getEffectivePrice, getActiveEarlybirdTier } from "@/lib/pricing";
-import MediaGallery from "@/components/public/MediaGallery";
 import CornerBrackets from "@/components/public/CornerBrackets";
 import { auth as participantAuth } from "@/lib/auth/participant";
 import { prisma } from "@/lib/prisma";
@@ -110,7 +109,21 @@ export default async function EventDetailPage({
           dangerouslySetInnerHTML={{ __html: event.description }}
         />
 
-        <MediaGallery sections={visibleSections} />
+        {visibleSections.length > 0 ? (
+          <Link
+            href={`/events/${event.slug}/media`}
+            className="group mt-10 flex items-center justify-between border border-white/10 px-5 py-4 text-sm text-white/80 transition-colors hover:border-accent"
+          >
+            <span className="flex items-center gap-2">
+              <FontAwesomeIcon icon={faImages} className="h-4 w-4" />
+              Bekijk media van dit event
+            </span>
+            <FontAwesomeIcon
+              icon={faArrowRight}
+              className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1"
+            />
+          </Link>
+        ) : null}
       </div>
     </article>
   );

@@ -6,9 +6,11 @@ import { getEffectivePrice, type EarlybirdTier } from "@/lib/pricing";
 export default function EventCard({
   event,
   isRegistered,
+  href,
 }: {
   event: Event & { earlybirdPrices: EarlybirdTier[] };
   isRegistered?: boolean;
+  href?: string;
 }) {
   const hasPrice = event.price != null || event.earlybirdPrices.length > 0;
   const stats = [
@@ -18,7 +20,7 @@ export default function EventCard({
   ].filter((stat): stat is string => stat !== null);
 
   return (
-    <Link href={`/events/${event.slug}`} className="group flex flex-col">
+    <Link href={href ?? `/events/${event.slug}`} className="group flex flex-col">
       <div className="relative aspect-[4/5] w-full overflow-hidden bg-gradient-to-br from-zinc-800 to-zinc-950">
         {event.coverImagePath ? (
           // eslint-disable-next-line @next/next/no-img-element -- served via the media API route, not a static asset next/image can optimize

@@ -24,7 +24,7 @@ export default async function MediaPage() {
         <div className="grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
           {pastEvents.map((event, index) => (
             <FadeIn key={event.id} delay={index * 0.06}>
-              <EventCard event={event} />
+              <EventCard event={event} href={`/events/${event.slug}/media`} />
             </FadeIn>
           ))}
         </div>

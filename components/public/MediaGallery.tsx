@@ -22,7 +22,15 @@ function Tile({ src, isVideo, onClick }: { src: string; isVideo: boolean; onClic
   );
 }
 
-export default function MediaGallery({ sections }: { sections: VisibleMediaSection[] }) {
+export default function MediaGallery({
+  sections,
+  bare = false,
+}: {
+  sections: VisibleMediaSection[];
+  // Skip the built-in "Media" heading/top-border — used on the dedicated
+  // /events/[slug]/media page, which already provides its own page heading.
+  bare?: boolean;
+}) {
   const [open, setOpen] = useState<{ sectionId: string; index: number } | null>(null);
 
   if (sections.length === 0) return null;
@@ -32,8 +40,8 @@ export default function MediaGallery({ sections }: { sections: VisibleMediaSecti
   const openSection = sections.find((s) => s.id === open?.sectionId);
 
   return (
-    <div className="mt-12 border-t border-white/10 pt-10">
-      <h2 className="font-display mb-6 text-xl font-medium text-white">Media</h2>
+    <div className={bare ? undefined : "mt-12 border-t border-white/10 pt-10"}>
+      {bare ? null : <h2 className="font-display mb-6 text-xl font-medium text-white">Media</h2>}
 
       {highlights.map((section) => (
         <div key={section.id} className="mb-10">

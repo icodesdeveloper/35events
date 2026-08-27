@@ -9,15 +9,9 @@ import DatePickerField from "@/components/admin/DatePickerField";
 import Switch from "@/components/admin/Switch";
 import FileDropzone from "@/components/admin/FileDropzone";
 import ConfirmSubmitButton from "@/components/admin/ConfirmSubmitButton";
+import SortableMediaGrid from "@/components/admin/SortableMediaGrid";
 import { labelClass, fieldClass } from "@/components/forms/EventFormFields";
-import {
-  updateSection,
-  deleteSection,
-  moveSection,
-  uploadMedia,
-  deleteMedia,
-  moveMedia,
-} from "@/app/admin/(dashboard)/events/[id]/media/actions";
+import { updateSection, deleteSection, moveSection, uploadMedia } from "@/app/admin/(dashboard)/events/[id]/media/actions";
 
 export default function MediaSectionCard({
   eventId,
@@ -170,60 +164,7 @@ export default function MediaSectionCard({
           </button>
         </form>
 
-        {section.media.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">Nog geen media in deze sectie.</p>
-        ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {section.media.map((item, index) => (
-              <div
-                key={item.id}
-                className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
-              >
-                <div className="aspect-square w-full bg-zinc-950">
-                  {item.type === "VIDEO" ? (
-                    <video className="h-full w-full object-cover" src={`/api/media/${item.filePath}`} muted />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element -- served via app/api/media
-                    <img src={`/api/media/${item.filePath}`} alt="" className="h-full w-full object-cover" />
-                  )}
-                </div>
-                <div className="flex items-center justify-between p-2">
-                  <div className="flex gap-1">
-                    <form action={moveMedia.bind(null, eventId, section.id, item.id, "up")}>
-                      <button
-                        type="submit"
-                        disabled={index === 0}
-                        className="rounded p-1.5 text-slate-400 transition-colors hover:text-zinc-900 disabled:opacity-30 dark:hover:text-white"
-                        aria-label="Naar boven"
-                      >
-                        <FontAwesomeIcon icon={faArrowUp} className="h-3 w-3" />
-                      </button>
-                    </form>
-                    <form action={moveMedia.bind(null, eventId, section.id, item.id, "down")}>
-                      <button
-                        type="submit"
-                        disabled={index === section.media.length - 1}
-                        className="rounded p-1.5 text-slate-400 transition-colors hover:text-zinc-900 disabled:opacity-30 dark:hover:text-white"
-                        aria-label="Naar beneden"
-                      >
-                        <FontAwesomeIcon icon={faArrowDown} className="h-3 w-3" />
-                      </button>
-                    </form>
-                  </div>
-                  <form action={deleteMedia.bind(null, eventId, item.id)}>
-                    <ConfirmSubmitButton
-                      confirmMessage="Dit mediabestand verwijderen?"
-                      className="rounded p-1.5 text-slate-400 transition-colors hover:text-red-600 dark:hover:text-red-400"
-                      ariaLabel="Verwijderen"
-                    >
-                      <FontAwesomeIcon icon={faTrash} className="h-3 w-3" />
-                    </ConfirmSubmitButton>
-                  </form>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <SortableMediaGrid eventId={eventId} sectionId={section.id} media={section.media} />
       </div>
     </div>
   );

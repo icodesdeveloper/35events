@@ -104,6 +104,16 @@ export async function moveSection(eventId: string, sectionId: string, direction:
   revalidatePath(`/admin/events/${eventId}/media`);
 }
 
+// Drag-and-drop reorder: the client already knows the full new order (unlike
+// moveSection's single-step swap), so this just writes index-as-order for
+// every id in one go instead of computing a neighbor swap.
+export async function reorderSections(eventId: string, orderedIds: string[]) {
+  await prisma.$transaction(
+    orderedIds.map((id, index) => prisma.eventMediaSection.update({ where: { id }, data: { order: index } })),
+  );
+  revalidatePath(`/admin/events/${eventId}/media`);
+}
+
 function mediaTypeFor(file: File): "PHOTO" | "VIDEO" {
   return file.type.startsWith("video/") ? "VIDEO" : "PHOTO";
 }
@@ -161,5 +171,12 @@ export async function moveMedia(eventId: string, sectionId: string, mediaId: str
     prisma.eventMedia.update({ where: { id: b.id }, data: { order: a.order } }),
   ]);
 
+  revalidatePath(`/admin/events/${eventId}/media`);
+}
+
+export async function reorderMedia(eventId: string, sectionId: string, orderedIds: string[]) {
+  await prisma.$transaction(
+    orderedIds.map((id, index) => prisma.eventMedia.update({ where: { id }, data: { order: index } })),
+  );
   revalidatePath(`/admin/events/${eventId}/media`);
 }
