@@ -1,4 +1,6 @@
 import { mkdir, writeFile, unlink } from "node:fs/promises";
+import { createReadStream, createWriteStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
 import path from "node:path";
 
 // STORAGE_ROOT defaults to a project-local folder for dev convenience; in
@@ -15,6 +17,22 @@ export async function save(buffer: Buffer, key: string): Promise<string> {
   await mkdir(path.dirname(destination), { recursive: true });
   await writeFile(destination, buffer);
   return key;
+}
+
+// Streaming counterpart to save() — pipes directly to disk instead of
+// buffering the whole upload in memory first, so multi-gigabyte videos
+// don't blow up process memory. Caller is responsible for deleting the
+// partial file on error (e.g. a busboy size-limit abort mid-pipe).
+export async function saveStream(source: NodeJS.ReadableStream, key: string): Promise<string> {
+  const destination = path.join(/* turbopackIgnore: true */ STORAGE_ROOT, key);
+  await mkdir(path.dirname(destination), { recursive: true });
+  await pipeline(source, createWriteStream(destination));
+  return key;
+}
+
+export function readRangeStream(key: string, range?: { start: number; end: number }) {
+  const destination = path.join(/* turbopackIgnore: true */ STORAGE_ROOT, key);
+  return range ? createReadStream(destination, range) : createReadStream(destination);
 }
 
 export async function remove(key: string): Promise<void> {

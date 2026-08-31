@@ -7,11 +7,11 @@ import { faArrowUp, faArrowDown, faTrash, faStar } from "@fortawesome/free-solid
 import SelectField from "@/components/admin/SelectField";
 import DatePickerField from "@/components/admin/DatePickerField";
 import Switch from "@/components/admin/Switch";
-import FileDropzone from "@/components/admin/FileDropzone";
 import ConfirmSubmitButton from "@/components/admin/ConfirmSubmitButton";
 import SortableMediaGrid from "@/components/admin/SortableMediaGrid";
+import MediaUploadForm from "@/components/admin/MediaUploadForm";
 import { labelClass, fieldClass } from "@/components/forms/EventFormFields";
-import { updateSection, deleteSection, moveSection, uploadMedia } from "@/app/admin/(dashboard)/events/[id]/media/actions";
+import { updateSection, deleteSection, moveSection } from "@/app/admin/(dashboard)/events/[id]/media/actions";
 
 export default function MediaSectionCard({
   eventId,
@@ -149,20 +149,7 @@ export default function MediaSectionCard({
       </form>
 
       <div className="p-4">
-        <form action={uploadMedia.bind(null, eventId, section.id)} className="mb-6 space-y-3">
-          <FileDropzone
-            name="files"
-            accept="image/*,video/*"
-            multiple
-            helpText="Foto's en video's, geen groottelimiet"
-          />
-          <button
-            type="submit"
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-slate-200"
-          >
-            Uploaden
-          </button>
-        </form>
+        <MediaUploadForm eventId={eventId} sectionId={section.id} />
 
         <SortableMediaGrid eventId={eventId} sectionId={section.id} media={section.media} />
       </div>

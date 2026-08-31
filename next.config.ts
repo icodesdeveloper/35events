@@ -10,6 +10,12 @@ const nextConfig: NextConfig = {
       // lib/storage/compressImage.ts).
       bodySizeLimit: "50mb",
     },
+    // proxy.ts matches /admin/:path*, so every admin request (including
+    // server-action form posts) passes through the proxy body buffer.
+    // Its own limit defaults to 10MB regardless of serverActions.bodySizeLimit
+    // above, silently truncating larger multipart uploads ("Unexpected end
+    // of form"). Keep this in sync with bodySizeLimit.
+    proxyClientMaxBodySize: "50mb",
   },
 };
 

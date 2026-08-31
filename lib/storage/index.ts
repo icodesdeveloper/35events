@@ -8,6 +8,8 @@ import { compressToUnderBytes } from "@/lib/storage/compressImage";
 // is a change to this file's implementation, not to callers.
 export const storage = {
   save: local.save,
+  saveStream: local.saveStream,
+  readRangeStream: local.readRangeStream,
   delete: local.remove,
   getUrl: local.getUrl,
 };

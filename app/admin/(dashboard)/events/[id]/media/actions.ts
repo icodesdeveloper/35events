@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { saveUploadedFile, storage } from "@/lib/storage";
+import { storage } from "@/lib/storage";
 import type { MediaVisibility, DownloadPermission } from "@/lib/media";
 
 const VISIBILITIES: MediaVisibility[] = ["PUBLIC", "PARTICIPANTS_ONLY", "HIDDEN"];
@@ -112,40 +112,6 @@ export async function reorderSections(eventId: string, orderedIds: string[]) {
     orderedIds.map((id, index) => prisma.eventMediaSection.update({ where: { id }, data: { order: index } })),
   );
   revalidatePath(`/admin/events/${eventId}/media`);
-}
-
-function mediaTypeFor(file: File): "PHOTO" | "VIDEO" {
-  return file.type.startsWith("video/") ? "VIDEO" : "PHOTO";
-}
-
-export async function uploadMedia(eventId: string, sectionId: string, formData: FormData) {
-  const event = await prisma.event.findUniqueOrThrow({ where: { id: eventId } });
-  const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
-  if (files.length === 0) return;
-
-  const currentMax = await prisma.eventMedia.aggregate({
-    where: { sectionId },
-    _max: { order: true },
-  });
-  let nextOrder = (currentMax._max.order ?? -1) + 1;
-
-  for (const file of files) {
-    const filePath = await saveUploadedFile(file, `events/${eventId}/media`);
-    await prisma.eventMedia.create({
-      data: {
-        eventId,
-        sectionId,
-        type: mediaTypeFor(file),
-        filePath,
-        order: nextOrder,
-      },
-    });
-    nextOrder += 1;
-  }
-
-  revalidatePath(`/admin/events/${eventId}/media`);
-  revalidatePath(`/events/${event.slug}`);
-  revalidatePath("/media");
 }
 
 export async function deleteMedia(eventId: string, mediaId: string) {

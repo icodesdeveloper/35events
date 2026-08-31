@@ -11,6 +11,7 @@ export default function FileDropzone({
   existingPreviewUrl,
   helpText,
   required,
+  onFilesSelected,
 }: {
   name: string;
   accept?: string;
@@ -18,6 +19,10 @@ export default function FileDropzone({
   existingPreviewUrl?: string;
   helpText?: string;
   required?: boolean;
+  // Escape hatch for callers that drive their own upload (e.g. to track
+  // per-file progress) instead of relying on this being read from a native
+  // form submission.
+  onFilesSelected?: (files: File[]) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -39,6 +44,7 @@ export default function FileDropzone({
     if (!multiple && files[0].type.startsWith("image/")) {
       setPreviewUrl(URL.createObjectURL(files[0]));
     }
+    onFilesSelected?.(Array.from(files));
   }
 
   const displayedPreview = previewUrl ?? existingPreviewUrl;
