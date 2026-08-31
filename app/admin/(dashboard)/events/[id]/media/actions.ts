@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { EventMedia } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { storage } from "@/lib/storage";
 import type { MediaVisibility, DownloadPermission } from "@/lib/media";
@@ -82,10 +83,39 @@ export async function updateSection(eventId: string, sectionId: string, formData
   await revalidateEvent(eventId);
 }
 
+// Every stored file for a media row: the original plus its derivatives (WebP
+// stills for both kinds, and the MP4 transcode for videos). Null entries are
+// rows predating a pipeline, or files that couldn't be derived.
+function storedPaths(
+  media: Pick<EventMedia, "filePath" | "thumbPath" | "previewPath" | "webPath">,
+): string[] {
+  return [media.filePath, media.thumbPath, media.previewPath, media.webPath].filter(
+    (p): p is string => p !== null,
+  );
+}
+
+// Best-effort on purpose: these run *after* the DB rows are already gone, so
+// letting one stuck file (a Windows lock, a permissions blip) reject would
+// fail the whole action with the delete already committed — the admin sees a
+// 500 for work that actually succeeded. An orphaned file is the cheaper
+// failure, so log and move on.
+async function deleteStoredFiles(paths: string[]): Promise<void> {
+  await Promise.all(
+    paths.map((p) =>
+      storage.delete(p).catch((error) => {
+        console.error(`Failed to delete stored file ${p}:`, error);
+      }),
+    ),
+  );
+}
+
 export async function deleteSection(eventId: string, sectionId: string) {
-  const media = await prisma.eventMedia.findMany({ where: { sectionId }, select: { filePath: true } });
+  const media = await prisma.eventMedia.findMany({
+    where: { sectionId },
+    select: { filePath: true, thumbPath: true, previewPath: true, webPath: true },
+  });
   await prisma.eventMediaSection.delete({ where: { id: sectionId } });
-  await Promise.all(media.map((m) => storage.delete(m.filePath)));
+  await deleteStoredFiles(media.flatMap(storedPaths));
   await revalidateEvent(eventId);
 }
 
@@ -119,7 +149,7 @@ export async function deleteMedia(eventId: string, mediaId: string) {
   if (!media) return;
 
   await prisma.eventMedia.delete({ where: { id: mediaId } });
-  await storage.delete(media.filePath);
+  await deleteStoredFiles(storedPaths(media));
 
   await revalidateEvent(eventId);
 }

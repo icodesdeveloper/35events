@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { EventMedia } from "@prisma/client";
 import {
   DndContext,
@@ -14,8 +15,29 @@ import { SortableContext, rectSortingStrategy, useSortable, arrayMove } from "@d
 import { CSS } from "@dnd-kit/utilities";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowUp, faArrowDown, faTrash, faGripVertical } from "@fortawesome/free-solid-svg-icons";
+import { thumbSrc } from "@/lib/mediaClient";
 import ConfirmSubmitButton from "@/components/admin/ConfirmSubmitButton";
 import { deleteMedia, moveMedia, reorderMedia } from "@/app/admin/(dashboard)/events/[id]/media/actions";
+
+// Transcoding runs in the background after upload, so a freshly added video
+// needs to say so — otherwise it just looks like a broken tile.
+function VideoBadge({ status }: { status: string | null }) {
+  if (status === "PROCESSING") {
+    return (
+      <span className="absolute inset-x-1.5 bottom-1.5 rounded bg-zinc-950/80 px-2 py-1 text-center text-[11px] font-medium text-white">
+        Video wordt verwerkt...
+      </span>
+    );
+  }
+  if (status === "FAILED") {
+    return (
+      <span className="absolute inset-x-1.5 bottom-1.5 rounded bg-red-600/90 px-2 py-1 text-center text-[11px] font-medium text-white">
+        Verwerking mislukt
+      </span>
+    );
+  }
+  return null;
+}
 
 function SortableTile({
   eventId,
@@ -42,11 +64,26 @@ function SortableTile({
     >
       <div className="relative aspect-square w-full bg-zinc-950">
         {item.type === "VIDEO" ? (
-          <video className="h-full w-full object-cover" src={`/api/media/${item.filePath}`} muted />
+          // Poster still once ffmpeg has produced one; until then there is no
+          // image to show, so fall back to the file itself with metadata-only
+          // preload rather than pulling down the whole video.
+          item.thumbPath ? (
+            // eslint-disable-next-line @next/next/no-img-element -- served via app/api/media
+            <img src={thumbSrc(item)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+          ) : (
+            <video className="h-full w-full object-cover" src={`/api/media/${item.filePath}`} muted preload="metadata" />
+          )
         ) : (
           // eslint-disable-next-line @next/next/no-img-element -- served via app/api/media
-          <img src={`/api/media/${item.filePath}`} alt="" className="h-full w-full object-cover" />
+          <img
+            src={thumbSrc(item)}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
         )}
+        {item.type === "VIDEO" ? <VideoBadge status={item.processingStatus} /> : null}
         <button
           type="button"
           {...attributes}
@@ -103,7 +140,19 @@ export default function SortableMediaGrid({
   sectionId: string;
   media: EventMedia[];
 }) {
+  const router = useRouter();
   const [items, setItems] = useState(media);
+
+  // Video transcoding finishes in the background with nothing to push the
+  // result to the page, so poll while any tile is still processing and stop
+  // as soon as none are.
+  const hasProcessing = items.some((item) => item.processingStatus === "PROCESSING");
+  useEffect(() => {
+    if (!hasProcessing) return;
+    const timer = setInterval(() => router.refresh(), 5000);
+    return () => clearInterval(timer);
+  }, [hasProcessing, router]);
+
   // Same reasoning as SortableSectionList: re-sync when the server sends a
   // fresh `media` prop (upload, delete, arrow-move all revalidate the page),
   // adjusted during render rather than in an effect.

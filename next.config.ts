@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // ffmpeg-static resolves its bundled binary from a __dirname-relative path
+  // at module load. Bundling it rewrites that path, so the server ends up
+  // spawning a binary that isn't there and every transcode fails. Keeping it
+  // external leaves the real node_modules layout intact.
+  serverExternalPackages: ["ffmpeg-static"],
   experimental: {
     serverActions: {
       // No practical limit on admin uploads (cover photos, event media) —

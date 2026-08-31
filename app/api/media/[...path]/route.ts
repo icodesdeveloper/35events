@@ -27,8 +27,12 @@ const EVENT_MEDIA_PATTERN = /^events\/[^/]+\/media\/[^/]+$/;
 async function isAuthorized(key: string, wantsDownload: boolean): Promise<boolean> {
   if (!EVENT_MEDIA_PATTERN.test(key)) return true;
 
+  // Matched against every derivative column, not just filePath: a thumb,
+  // preview or transcode lives under the same events/*/media/* prefix as its
+  // original, so a filePath-only lookup would leave the derivatives of a
+  // hidden section publicly reachable.
   const media = await prisma.eventMedia.findFirst({
-    where: { filePath: key },
+    where: { OR: [{ filePath: key }, { thumbPath: key }, { previewPath: key }, { webPath: key }] },
     include: { event: true, section: true },
   });
   if (!media) return true; // not a tracked EventMedia row (shouldn't happen for this path shape, but fail open to a 404 below via the normal file-not-found path)

@@ -5,20 +5,19 @@ import "plyr/dist/plyr.css";
 
 export default function VideoPlayer({
   src,
+  poster,
   className,
-  autoPlayMuted = false,
 }: {
   src: string;
+  // Video's own poster frame (see lib/storage/deriveVideo.ts) — shown before
+  // playback so nothing but a WebP still is fetched until the viewer hits
+  // play, which is what `preload="none"` below relies on.
+  poster?: string;
   className?: string;
-  // Preview mode for grid tiles / highlight hero — muted, looping, no
-  // controls, just a moving preview (click-through handled by the parent).
-  autoPlayMuted?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (autoPlayMuted) return; // Plyr's own controls aren't needed for a bare preview loop
-
     // Plyr touches `document` at module-load time, so it can only be
     // imported client-side — a static top-level import crashes SSR since
     // this component's module still executes on the server for the initial
@@ -35,22 +34,20 @@ export default function VideoPlayer({
       cancelled = true;
       player?.destroy();
     };
-  }, [autoPlayMuted]);
+  }, []);
 
-  if (autoPlayMuted) {
-    return (
-      <video
-        ref={videoRef}
-        src={src}
-        className={className}
-        muted
-        autoPlay
-        loop
-        playsInline
-        preload="metadata"
-      />
-    );
-  }
-
-  return <video ref={videoRef} src={src} className={className} playsInline preload="metadata" controls />;
+  return (
+    <video
+      ref={videoRef}
+      src={src}
+      poster={poster}
+      className={className}
+      playsInline
+      // With a poster there is nothing to gain from fetching metadata up
+      // front, and plenty to lose — this is what keeps a gallery from
+      // touching the video files at all until someone plays one.
+      preload={poster ? "none" : "metadata"}
+      controls
+    />
+  );
 }

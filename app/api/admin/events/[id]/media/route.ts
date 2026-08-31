@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth/admin";
 import { prisma } from "@/lib/prisma";
 import { storage, storageKey } from "@/lib/storage";
-import { MAX_MEDIA_UPLOAD_BYTES } from "@/lib/mediaLimits";
+import { deriveImages } from "@/lib/storage/deriveImages";
+import { startVideoProcessing } from "@/lib/storage/processVideo";
+import { MAX_MEDIA_UPLOAD_BYTES } from "@/lib/mediaClient";
 
 // Separate from the uploadMedia server action (app/admin/(dashboard)/events/[id]/media/actions.ts)
 // so the client can drive the upload with XMLHttpRequest and get real
@@ -88,6 +90,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Invalid upload" }, { status: 400 });
   }
 
+  // Photos are cheap enough to derive inline (~0.5s). Videos are not — a
+  // transcode runs for minutes — so those are kicked off in the background
+  // below and the row starts as PROCESSING. A derivation failure just leaves
+  // the columns null; every consumer falls back to filePath.
+  const derivatives = fileType === "PHOTO" ? await deriveImages(filePath) : null;
+
   const currentMax = await prisma.eventMedia.aggregate({ where: { sectionId }, _max: { order: true } });
   const media = await prisma.eventMedia.create({
     data: {
@@ -95,9 +103,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       sectionId,
       type: fileType,
       filePath,
+      thumbPath: derivatives?.thumbPath ?? null,
+      previewPath: derivatives?.previewPath ?? null,
+      processingStatus: fileType === "VIDEO" ? "PROCESSING" : null,
       order: (currentMax._max.order ?? -1) + 1,
     },
   });
+
+  // Deliberately not awaited — the upload response returns now and ffmpeg
+  // keeps running. The admin grid polls the row's processingStatus.
+  if (fileType === "VIDEO") startVideoProcessing(media.id, filePath);
 
   revalidatePath(`/admin/events/${eventId}/media`);
   revalidatePath(`/events/${event.slug}`);

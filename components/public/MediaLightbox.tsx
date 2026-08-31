@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark, faChevronLeft, faChevronRight, faDownload } from "@fortawesome/free-solid-svg-icons";
 import type { EventMedia } from "@prisma/client";
+import { previewSrc, downloadSrc, videoSrc } from "@/lib/mediaClient";
 import VideoPlayer from "@/components/public/VideoPlayer";
 
 const SLIDE_VARIANTS = {
@@ -57,14 +58,17 @@ export default function MediaLightbox({
   }, [media.length, onClose]);
 
   if (!item) return null;
-  const src = `/api/media/${item.filePath}`;
+  // Viewing gets the downscaled derivative — the WebP preview for a photo,
+  // the 1080p transcode for a video. Only the download link reaches for the
+  // full-resolution original.
+  const src = item.type === "VIDEO" ? videoSrc(item) : previewSrc(item);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/95 backdrop-blur-sm" role="dialog" aria-modal="true">
       <div className="flex items-center justify-end gap-2 p-4">
         {canDownload ? (
           <a
-            href={`${src}?download=1`}
+            href={downloadSrc(item)}
             download
             className="rounded-full p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
             aria-label="Downloaden"
@@ -107,7 +111,12 @@ export default function MediaLightbox({
               className="absolute inset-0 flex items-center justify-center"
             >
               {item.type === "VIDEO" ? (
-                <VideoPlayer key={item.id} src={src} className="max-h-full max-w-full min-h-0 min-w-0" />
+                <VideoPlayer
+                  key={item.id}
+                  src={src}
+                  poster={item.previewPath ? previewSrc(item) : undefined}
+                  className="max-h-full max-w-full min-h-0 min-w-0"
+                />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element -- served via app/api/media
                 <img

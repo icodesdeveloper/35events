@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUser } from "@fortawesome/free-solid-svg-icons";
 import { auth as participantAuth } from "@/lib/auth/participant";
 import { getSettings } from "@/lib/settings";
+import MobileNav from "@/components/public/MobileNav";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -32,7 +33,7 @@ export default async function PublicHeader() {
           )}
         </Link>
 
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-3 md:gap-8">
           <nav className="font-mono-label hidden items-center gap-7 text-xs text-white/60 md:flex">
             {NAV_LINKS.map((link) => (
               <Link key={link.href} href={link.href} className="transition-colors hover:text-white">
@@ -46,8 +47,10 @@ export default async function PublicHeader() {
             className="flex items-center gap-2 border border-white/20 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:border-accent hover:text-accent"
           >
             <FontAwesomeIcon icon={faUser} className="h-3.5 w-3.5" />
-            {isLoggedIn ? "Mijn account" : "Inloggen"}
+            <span className="hidden sm:inline">{isLoggedIn ? "Mijn account" : "Inloggen"}</span>
           </Link>
+
+          <MobileNav links={NAV_LINKS} />
         </div>
       </div>
     </header>

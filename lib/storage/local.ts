@@ -43,6 +43,12 @@ export async function remove(key: string): Promise<void> {
   }
 }
 
+// For writers that produce a file at resolvePath(key) themselves (ffmpeg
+// writing its own output) rather than going through save()/saveStream().
+export async function ensureDirFor(key: string): Promise<void> {
+  await mkdir(path.dirname(path.join(/* turbopackIgnore: true */ STORAGE_ROOT, key)), { recursive: true });
+}
+
 export function resolvePath(key: string): string {
   return path.join(/* turbopackIgnore: true */ STORAGE_ROOT, key);
 }

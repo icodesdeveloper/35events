@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import FileDropzone from "@/components/admin/FileDropzone";
-import { MAX_MEDIA_UPLOAD_BYTES } from "@/lib/mediaLimits";
+import { MAX_MEDIA_UPLOAD_BYTES } from "@/lib/mediaClient";
 
 const MAX_MEDIA_UPLOAD_GB = Math.round(MAX_MEDIA_UPLOAD_BYTES / (1024 * 1024 * 1024));
 

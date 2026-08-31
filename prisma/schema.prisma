@@ -213,6 +213,28 @@ model EventMedia {
   order     Int      @default(0)
   createdAt DateTime @default(now())
 
+  // Downscaled WebP still-image derivatives of filePath, generated at upload
+  // time. Grids render thumbPath and the lightbox renders previewPath, so a
+  // gallery of hundreds of 10MB photos doesn't ship the originals — those are
+  // served only on an explicit download. For a PHOTO these come from
+  // lib/storage/deriveImages.ts; for a VIDEO they're poster frames grabbed by
+  // lib/storage/deriveVideo.ts, which is what lets a video tile show a still
+  // instead of streaming the file. Null for rows predating this and for files
+  // ffmpeg/sharp couldn't decode; every consumer falls back to filePath.
+  thumbPath   String?
+  previewPath String?
+
+  // VIDEO only: web-optimized 1080p H.264 transcode used for playback, so
+  // visitors never stream the multi-gigabyte original. Null while it is still
+  // being produced (see processingStatus) or if transcoding failed — players
+  // fall back to filePath, which always works, just heavier.
+  webPath String?
+
+  // VIDEO only: PROCESSING | READY | FAILED. Transcoding runs in the
+  // background after the upload response, so this is what the admin UI reads
+  // to show "wordt verwerkt". Null for photos and for legacy rows.
+  processingStatus String?
+
   event   Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
   section EventMediaSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
 
