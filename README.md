@@ -123,3 +123,30 @@ Build command: `npm ci && npx prisma migrate deploy && npx prisma generate && np
 Start command: `npm run start`
 
 Zet `STORAGE_ROOT` op een submap van de persistente serverdata (bv. `/home/container/storage/uploads`). Volledige env-lijst staat in `.env.example`.
+
+### Geheugen tijdens de build
+
+`next build` bepaalt zijn aantal workers via `os.cpus()`, en dat rapporteert in
+een container de **cores van de host** in plaats van je eigen limiet. Op een
+kleine container start hij daardoor tien of meer worker-processen en wordt de
+build door de kernel afgeschoten — je ziet dan enkel `Killed`, gevolgd door
+`Could not find a production build in the '.next' directory` omdat er niets
+gebouwd is.
+
+`next.config.ts` zet daarom `experimental.cpus` vast (standaard 2). Nog te krap?
+Zet `NEXT_BUILD_CPUS=1` in de env. Meer geheugen beschikbaar en liever een
+snellere build? Zet hem hoger.
+
+Helpt ook op een krappe container: `NODE_OPTIONS=--max-old-space-size=1536`
+(kies een waarde ónder je containerlimiet). V8 gaat dan zelf opruimen vóór de
+kernel ingrijpt, in plaats van tegen de harde limiet aan te lopen.
+
+### Let op bij het start-commando
+
+- Ketting de stappen met `&&`, niet met `;`. Met `;` start `next start` ook als
+  de build faalde, en dan krijg je de verwarrende "Could not find a production
+  build" in plaats van de échte fout.
+- Draai `npm run media:derivatives` **niet** vóór `next start`. Eén grote video
+  transcoderen duurt minuten, en zolang staat de site plat. Nieuwe uploads
+  krijgen hun derivatives sowieso automatisch; draai dit script handmatig
+  wanneer je oude media bijwerkt of een onderbroken transcode wil hervatten.
