@@ -141,12 +141,26 @@ Helpt ook op een krappe container: `NODE_OPTIONS=--max-old-space-size=1536`
 (kies een waarde ónder je containerlimiet). V8 gaat dan zelf opruimen vóór de
 kernel ingrijpt, in plaats van tegen de harde limiet aan te lopen.
 
-### Let op bij het start-commando
+### Start-commando
 
-- Ketting de stappen met `&&`, niet met `;`. Met `;` start `next start` ook als
-  de build faalde, en dan krijg je de verwarrende "Could not find a production
-  build" in plaats van de échte fout.
-- Draai `npm run media:derivatives` **niet** vóór `next start`. Eén grote video
-  transcoderen duurt minuten, en zolang staat de site plat. Nieuwe uploads
-  krijgen hun derivatives sowieso automatisch; draai dit script handmatig
-  wanneer je oude media bijwerkt of een onderbroken transcode wil hervatten.
+Het Pterodactyl-startveld verwacht één regel — plak deze exact zo, zonder
+regeleindes:
+
+```
+if [[ -d .git ]] && [[ "${AUTO_UPDATE}" == "1" ]]; then git pull; fi && npm ci && npx prisma generate && npx prisma db push && npm run build && npx next start -p ${SERVER_PORT} -H 0.0.0.0
+```
+
+Twee dingen die daarin bewust anders zijn dan voorheen:
+
+- **`&&` in plaats van `;`.** Met `;` start `next start` ook wanneer de build
+  faalde, en dan krijg je de verwarrende "Could not find a production build" in
+  plaats van de échte fout (bv. een OOM-kill).
+- **`npm run media:derivatives` is eruit.** Eén grote video transcoderen duurt
+  minuten, en zolang staat de site plat. Nieuwe uploads krijgen hun derivatives
+  sowieso automatisch; draai dit script handmatig wanneer je oude media
+  bijwerkt of een onderbroken transcode wil hervatten.
+
+`npx prisma db push` blijft hier staan omdat de database daarmee is opgebouwd.
+Wil je naar `prisma migrate deploy`, dan moet je de bestaande migraties eerst
+baselinen met `prisma migrate resolve --applied <naam>` — anders probeert
+`migrate deploy` alle migraties toe te passen op tabellen die al bestaan.
