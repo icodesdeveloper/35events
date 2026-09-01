@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { resolveEffectiveVisibility } from "@/lib/media";
 import { createSection } from "@/app/admin/(dashboard)/events/[id]/media/actions";
 import EventMediaSettingsForm from "@/components/admin/EventMediaSettingsForm";
 import SortableSectionList from "@/components/admin/SortableSectionList";
@@ -29,7 +30,16 @@ export default async function EventMediaPage({ params }: { params: Promise<{ id:
       {event.mediaSections.length === 0 ? (
         <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">Nog geen secties voor dit event.</p>
       ) : (
-        <SortableSectionList eventId={event.id} sections={event.mediaSections} />
+        <SortableSectionList
+          eventId={event.id}
+          // Resolved here rather than in the card: the inherit-from-event
+          // logic lives in lib/media, which imports Prisma and so can't be
+          // pulled into a client component.
+          sections={event.mediaSections.map((section) => ({
+            ...section,
+            effectiveVisibility: resolveEffectiveVisibility(event, section),
+          }))}
+        />
       )}
 
       <form

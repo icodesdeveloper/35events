@@ -117,6 +117,12 @@ model EventMediaSection {
   order       Int     @default(0)
   isHighlight Boolean @default(false)
 
+  // Public gallery only: render this section collapsed so a visitor has to
+  // open it themselves. Purely presentational — it does not hide anything
+  // that visibility/download rights would otherwise allow. The admin list is
+  // always collapsed on load regardless, which is local UI state, not this.
+  collapsedByDefault Boolean @default(false)
+
   // Visibility and download rights are two fully independent dimensions —
   // each with its own inherit-from-event switch, deliberately not bundled
   // into one "override" toggle (a section may be visible to participants

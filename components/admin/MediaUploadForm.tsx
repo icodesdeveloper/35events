@@ -14,17 +14,40 @@ type UploadItem = {
   errorMessage?: string;
 };
 
+type UploadResult = { ok: true } | { ok: false; message: string };
+
+// A bare "Mislukt" is useless when only some files fail — these messages are
+// what tell you whether the server rejected the file, the request never
+// reached it, or the connection dropped mid-upload (which is what a process
+// that got OOM-killed looks like from the browser).
+function failureMessage(xhr: XMLHttpRequest): string {
+  try {
+    const body = JSON.parse(xhr.responseText) as { error?: string };
+    if (body.error) return `${body.error} (${xhr.status})`;
+  } catch {
+    // Not JSON — fall through to the generic status message.
+  }
+  if (xhr.status === 413) return "Bestand te groot (413)";
+  if (xhr.status === 401) return "Sessie verlopen — log opnieuw in (401)";
+  return `Serverfout (${xhr.status})`;
+}
+
 // sectionId travels as a query param, not a form field — the API route
 // validates it before reading any of the (potentially multi-gigabyte) body.
 function uploadFile(eventId: string, sectionId: string, file: File, onProgress: (progress: number) => void) {
-  return new Promise<boolean>((resolve) => {
+  return new Promise<UploadResult>((resolve) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `/api/admin/events/${eventId}/media?sectionId=${encodeURIComponent(sectionId)}`);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
     };
-    xhr.onload = () => resolve(xhr.status >= 200 && xhr.status < 300);
-    xhr.onerror = () => resolve(false);
+    xhr.onload = () =>
+      resolve(
+        xhr.status >= 200 && xhr.status < 300 ? { ok: true } : { ok: false, message: failureMessage(xhr) },
+      );
+    xhr.onerror = () => resolve({ ok: false, message: "Verbinding verbroken tijdens uploaden" });
+    xhr.onabort = () => resolve({ ok: false, message: "Upload afgebroken" });
+    xhr.ontimeout = () => resolve({ ok: false, message: "Time-out tijdens uploaden" });
 
     const formData = new FormData();
     formData.append("file", file);
@@ -53,8 +76,12 @@ export default function MediaUploadForm({ eventId, sectionId }: { eventId: strin
         continue;
       }
       updateItem(i, { status: "uploading" });
-      const ok = await uploadFile(eventId, sectionId, items[i].file, (progress) => updateItem(i, { progress }));
-      updateItem(i, { status: ok ? "done" : "error", progress: 100 });
+      const result = await uploadFile(eventId, sectionId, items[i].file, (progress) => updateItem(i, { progress }));
+      updateItem(i, {
+        status: result.ok ? "done" : "error",
+        progress: 100,
+        errorMessage: result.ok ? undefined : result.message,
+      });
     }
 
     setUploading(false);
@@ -78,11 +105,7 @@ export default function MediaUploadForm({ eventId, sectionId }: { eventId: strin
               <div className="mb-1 flex items-center justify-between text-slate-600 dark:text-slate-300">
                 <span className="truncate">{item.file.name}</span>
                 <span className="shrink-0 pl-2">
-                  {item.status === "error"
-                    ? (item.errorMessage ?? "Mislukt")
-                    : item.status === "done"
-                      ? "Klaar"
-                      : `${item.progress}%`}
+                  {item.status === "error" ? "Mislukt" : item.status === "done" ? "Klaar" : `${item.progress}%`}
                 </span>
               </div>
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-zinc-800">
@@ -93,6 +116,9 @@ export default function MediaUploadForm({ eventId, sectionId }: { eventId: strin
                   style={{ width: `${item.progress}%` }}
                 />
               </div>
+              {item.status === "error" && item.errorMessage ? (
+                <p className="mt-1 text-red-600 dark:text-red-400">{item.errorMessage}</p>
+              ) : null}
             </li>
           ))}
         </ul>

@@ -72,6 +72,7 @@ export async function updateSection(eventId: string, sectionId: string, formData
     data: {
       title: title || undefined,
       isHighlight: formData.get("isHighlight") === "on",
+      collapsedByDefault: formData.get("collapsedByDefault") === "on",
       inheritVisibility,
       visibility: readVisibility(formData.get("visibility")),
       visibleFromDate,

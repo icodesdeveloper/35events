@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { EventMedia } from "@prisma/client";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlay } from "@fortawesome/free-solid-svg-icons";
+import { faPlay, faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import type { VisibleMediaSection } from "@/lib/media";
 import { thumbSrc } from "@/lib/mediaClient";
 import MediaLightbox from "@/components/public/MediaLightbox";
@@ -43,6 +43,54 @@ function Tile({ item, onClick }: { item: EventMedia; onClick: () => void }) {
   );
 }
 
+// A section the admin marked `collapsedByDefault` starts closed and gets a
+// clickable header; everything else renders open with its plain heading, as
+// before. Collapsing is presentation only — nothing here gates access, that
+// is settled server-side by the visibility rules.
+function Section({
+  section,
+  children,
+  headingClassName,
+}: {
+  section: VisibleMediaSection;
+  children: React.ReactNode;
+  headingClassName: string;
+}) {
+  const [expanded, setExpanded] = useState(!section.collapsedByDefault);
+
+  if (!section.collapsedByDefault) {
+    return (
+      <div className="mb-10">
+        {section.title ? <p className={headingClassName}>{section.title}</p> : null}
+        {children}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-10">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="group mb-3 flex w-full items-center gap-2.5 border-b border-white/10 pb-3 text-left transition-colors hover:border-white/25"
+      >
+        <FontAwesomeIcon
+          icon={faChevronRight}
+          className={`h-3 w-3 shrink-0 text-white/40 transition-transform group-hover:text-white/70 ${
+            expanded ? "rotate-90" : ""
+          }`}
+        />
+        <span className={`${headingClassName} mb-0`}>{section.title}</span>
+        <span className="font-mono-label ml-auto shrink-0 text-xs text-white/40">
+          {section.media.length}
+        </span>
+      </button>
+      {expanded ? children : null}
+    </div>
+  );
+}
+
 export default function MediaGallery({
   sections,
   bare = false,
@@ -65,8 +113,7 @@ export default function MediaGallery({
       {bare ? null : <h2 className="font-display mb-6 text-xl font-medium text-white">Media</h2>}
 
       {highlights.map((section) => (
-        <div key={section.id} className="mb-10">
-          <p className="font-mono-label text-accent mb-3 text-xs">{section.title}</p>
+        <Section key={section.id} section={section} headingClassName="font-mono-label text-accent mb-3 text-xs">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {section.media.map((item, index) => (
               <Tile
@@ -76,12 +123,11 @@ export default function MediaGallery({
               />
             ))}
           </div>
-        </div>
+        </Section>
       ))}
 
       {regular.map((section) => (
-        <div key={section.id} className="mb-10">
-          {section.title ? <p className="mb-3 text-sm font-medium text-white/70">{section.title}</p> : null}
+        <Section key={section.id} section={section} headingClassName="mb-3 text-sm font-medium text-white/70">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {section.media.map((item, index) => (
               <Tile
@@ -91,7 +137,7 @@ export default function MediaGallery({
               />
             ))}
           </div>
-        </div>
+        </Section>
       ))}
 
       {open && openSection ? (

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import type { EventMedia, EventMediaSection } from "@prisma/client";
 import {
   DndContext,
   closestCenter,
@@ -19,21 +18,23 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGripVertical } from "@fortawesome/free-solid-svg-icons";
-import MediaSectionCard from "@/components/admin/MediaSectionCard";
+import MediaSectionCard, { type AdminMediaSection } from "@/components/admin/MediaSectionCard";
 import { reorderSections } from "@/app/admin/(dashboard)/events/[id]/media/actions";
-
-type SectionWithMedia = EventMediaSection & { media: EventMedia[] };
 
 function SortableSection({
   eventId,
   section,
   isFirst,
   isLast,
+  expanded,
+  onToggleExpanded,
 }: {
   eventId: string;
-  section: SectionWithMedia;
+  section: AdminMediaSection;
   isFirst: boolean;
   isLast: boolean;
+  expanded: boolean;
+  onToggleExpanded: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id });
 
@@ -53,7 +54,14 @@ function SortableSection({
         <FontAwesomeIcon icon={faGripVertical} className="h-3.5 w-3.5" />
       </button>
       <div className="pl-8">
-        <MediaSectionCard eventId={eventId} section={section} isFirst={isFirst} isLast={isLast} />
+        <MediaSectionCard
+          eventId={eventId}
+          section={section}
+          isFirst={isFirst}
+          isLast={isLast}
+          expanded={expanded}
+          onToggleExpanded={onToggleExpanded}
+        />
       </div>
     </div>
   );
@@ -64,9 +72,24 @@ export default function SortableSectionList({
   sections,
 }: {
   eventId: string;
-  sections: SectionWithMedia[];
+  sections: AdminMediaSection[];
 }) {
   const [items, setItems] = useState(sections);
+  // Everything starts collapsed: with a few sections of a few hundred photos
+  // each, an all-expanded page is unusable. Expansion is per-session client
+  // state — it survives the revalidate that follows an edit or upload, since
+  // the cards keep their keys and stay mounted.
+  const [expandedIds, setExpandedIds] = useState<ReadonlySet<string>>(new Set());
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }
+
+  const allExpanded = items.length > 0 && expandedIds.size === items.length;
   // Re-sync whenever the server gives us fresh data (any edit inside a
   // section card — title, visibility, uploads, ... — revalidates the page
   // and passes a new `sections` prop down). Adjusting state during render
@@ -95,18 +118,35 @@ export default function SortableSectionList({
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={items.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-        {items.map((section, index) => (
-          <SortableSection
-            key={section.id}
-            eventId={eventId}
-            section={section}
-            isFirst={index === 0}
-            isLast={index === items.length - 1}
-          />
-        ))}
-      </SortableContext>
-    </DndContext>
+    <>
+      <div className="mb-3 flex items-center justify-between pl-8">
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          {items.length === 1 ? "1 sectie" : `${items.length} secties`}
+        </p>
+        <button
+          type="button"
+          onClick={() => setExpandedIds(allExpanded ? new Set() : new Set(items.map((s) => s.id)))}
+          className="text-xs font-medium text-slate-500 transition-colors hover:text-zinc-900 dark:text-slate-400 dark:hover:text-white"
+        >
+          {allExpanded ? "Alles inklappen" : "Alles uitklappen"}
+        </button>
+      </div>
+
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={items.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+          {items.map((section, index) => (
+            <SortableSection
+              key={section.id}
+              eventId={eventId}
+              section={section}
+              isFirst={index === 0}
+              isLast={index === items.length - 1}
+              expanded={expandedIds.has(section.id)}
+              onToggleExpanded={() => toggleExpanded(section.id)}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
+    </>
   );
 }

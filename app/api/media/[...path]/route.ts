@@ -6,6 +6,7 @@ import { resolvePath } from "@/lib/storage/local";
 import { storage } from "@/lib/storage";
 import { prisma } from "@/lib/prisma";
 import { auth as participantAuth } from "@/lib/auth/participant";
+import { auth as adminAuth } from "@/lib/auth/admin";
 import { getMediaViewer, canViewVisibility, canDownload, resolveEffectiveVisibility, resolveEffectiveDownloadPermission } from "@/lib/media";
 
 const MIME_TYPES: Record<string, string> = {
@@ -41,10 +42,64 @@ async function isAuthorized(key: string, wantsDownload: boolean): Promise<boolea
   const viewer = await getMediaViewer(session?.user?.participantId ?? null);
   const visibility = resolveEffectiveVisibility(media.event, media.section);
 
-  if (!wantsDownload) return canViewVisibility(visibility, media.eventId, viewer);
+  const allowed = wantsDownload
+    ? canDownload(visibility, resolveEffectiveDownloadPermission(media.event, media.section), media.eventId, viewer)
+    : canViewVisibility(visibility, media.eventId, viewer);
+  if (allowed) return true;
 
-  const downloadPermission = resolveEffectiveDownloadPermission(media.event, media.section);
-  return canDownload(visibility, downloadPermission, media.eventId, viewer);
+  // Admins manage this media, so they may always see it. Without this the
+  // admin grid renders broken tiles for every section that isn't publicly
+  // visible — which is the normal state while an event is still being
+  // prepared. Checked only after the public rules say no, so the common
+  // visitor request never pays for an extra session lookup.
+  const admin = await adminAuth();
+  return Boolean(admin?.user?.isAdmin);
+}
+
+// Deliberately not `Readable.toWeb()`: that adapter keeps enqueueing after the
+// consumer has gone away, and the resulting "Invalid state: Controller is
+// already closed" surfaces as an *uncaught* exception that can take the server
+// down. Clients abort mid-response constantly — a <video> element does it on
+// every seek, and the bigger the file the wider the window — so this wires the
+// events up itself, guards every controller call, and destroys the file handle
+// on cancel.
+function fileStreamToWeb(nodeStream: Readable): ReadableStream<Uint8Array> {
+  let finished = false;
+
+  const finish = (fn: () => void) => {
+    if (finished) return;
+    finished = true;
+    try {
+      fn();
+    } catch {
+      // The consumer already tore the stream down; nothing left to report to.
+    }
+    nodeStream.destroy();
+  };
+
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      nodeStream.on("data", (chunk: Buffer) => {
+        if (finished) return;
+        try {
+          controller.enqueue(new Uint8Array(chunk));
+        } catch {
+          finish(() => {});
+          return;
+        }
+        // Respect backpressure so a big file isn't slurped into memory.
+        if (controller.desiredSize !== null && controller.desiredSize <= 0) nodeStream.pause();
+      });
+      nodeStream.on("end", () => finish(() => controller.close()));
+      nodeStream.on("error", (error) => finish(() => controller.error(error)));
+    },
+    pull() {
+      nodeStream.resume();
+    },
+    cancel() {
+      finish(() => {});
+    },
+  });
 }
 
 // bytes=<start>-<end> | bytes=<start>- | bytes=-<suffixLength>. Only the
@@ -112,11 +167,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ path
   if (range) {
     headers["Content-Range"] = `bytes ${range.start}-${range.end}/${fileStat.size}`;
     headers["Content-Length"] = String(range.end - range.start + 1);
-    const body = Readable.toWeb(storage.readRangeStream(key, range)) as ReadableStream;
-    return new NextResponse(body, { status: 206, headers });
+    return new NextResponse(fileStreamToWeb(storage.readRangeStream(key, range)), { status: 206, headers });
   }
 
   headers["Content-Length"] = String(fileStat.size);
-  const body = Readable.toWeb(storage.readRangeStream(key)) as ReadableStream;
-  return new NextResponse(body, { status: 200, headers });
+  return new NextResponse(fileStreamToWeb(storage.readRangeStream(key)), { status: 200, headers });
 }
