@@ -124,6 +124,12 @@ Start command: `npm run start`
 
 Zet `STORAGE_ROOT` op een submap van de persistente serverdata (bv. `/home/container/storage/uploads`). Volledige env-lijst staat in `.env.example`.
 
+**`SITE_URL` is verplicht in productie**, bv. `SITE_URL=https://35events.com`. De app
+draait met `-H 0.0.0.0`, dus een verzoek kent zijn eigen publieke domein niet — zonder
+deze variabele wijzen media-deellinks, e-maillinks en de sitemap naar
+`http://localhost:3000` of `http://0.0.0.0:<poort>`. Ontbreekt hij, dan logt de app
+bij het opstarten een waarschuwing.
+
 ### Geheugen tijdens de build
 
 `next build` bepaalt zijn aantal workers via `os.cpus()`, en dat rapporteert in
