@@ -29,6 +29,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ id: 
     id: t.id,
     deadline: t.deadline.toISOString().slice(0, 10),
     price: t.price.toString(),
+    passengerPrice: t.passengerPrice?.toString() ?? null,
   }));
 
   // If there's a pending, unpublished draft, show ITS values in the form

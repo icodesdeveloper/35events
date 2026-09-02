@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { resolveEffectiveVisibility } from "@/lib/media";
 import { createSection } from "@/app/admin/(dashboard)/events/[id]/media/actions";
+import { SITE_URL } from "@/lib/site";
 import EventMediaSettingsForm from "@/components/admin/EventMediaSettingsForm";
+import MediaShareLinks from "@/components/admin/MediaShareLinks";
 import SortableSectionList from "@/components/admin/SortableSectionList";
 import { fieldClass } from "@/components/forms/EventFormFields";
 
@@ -10,7 +12,10 @@ export default async function EventMediaPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const event = await prisma.event.findUnique({
     where: { id },
-    include: { mediaSections: { orderBy: { order: "asc" }, include: { media: { orderBy: { order: "asc" } } } } },
+    include: {
+      mediaSections: { orderBy: { order: "asc" }, include: { media: { orderBy: { order: "asc" } } } },
+      mediaShareLinks: { orderBy: { createdAt: "desc" } },
+    },
   });
   if (!event) notFound();
 
@@ -26,6 +31,8 @@ export default async function EventMediaPage({ params }: { params: Promise<{ id:
         mediaVisibleFromTarget={event.mediaVisibleFromTarget}
         downloadPermission={event.downloadPermission}
       />
+
+      <MediaShareLinks eventId={event.id} links={event.mediaShareLinks} baseUrl={SITE_URL} />
 
       {event.mediaSections.length === 0 ? (
         <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">Nog geen secties voor dit event.</p>

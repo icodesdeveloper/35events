@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { EventMedia } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { storage } from "@/lib/storage";
+import { generateShareToken } from "@/lib/mediaShare";
 import type { MediaVisibility, DownloadPermission } from "@/lib/media";
 
 const VISIBILITIES: MediaVisibility[] = ["PUBLIC", "PARTICIPANTS_ONLY", "HIDDEN"];
@@ -48,6 +49,32 @@ export async function updateEventMediaSettings(eventId: string, formData: FormDa
     },
   });
   await revalidateEvent(eventId);
+}
+
+// Share links (see lib/mediaShare.ts) — a link lifts whoever opens it to
+// participant level for this one event, so PARTICIPANTS_ONLY sections become
+// visible without an account. Revoking is the kill switch: getSharedEventIds
+// filters on revokedAt, so access stops on the very next request even for
+// someone who already holds the cookie.
+export async function createShareLink(eventId: string, formData: FormData) {
+  const label = String(formData.get("label") ?? "").trim();
+  await prisma.eventMediaShareLink.create({
+    data: { eventId, token: generateShareToken(), label: label || null },
+  });
+  revalidatePath(`/admin/events/${eventId}/media`);
+}
+
+export async function revokeShareLink(eventId: string, linkId: string) {
+  await prisma.eventMediaShareLink.updateMany({
+    where: { id: linkId, eventId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+  revalidatePath(`/admin/events/${eventId}/media`);
+}
+
+export async function deleteShareLink(eventId: string, linkId: string) {
+  await prisma.eventMediaShareLink.deleteMany({ where: { id: linkId, eventId } });
+  revalidatePath(`/admin/events/${eventId}/media`);
 }
 
 export async function createSection(eventId: string, formData: FormData) {

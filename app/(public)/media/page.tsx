@@ -3,13 +3,27 @@ import { auth as participantAuth } from "@/lib/auth/participant";
 import FadeIn from "@/components/public/FadeIn";
 import EventCard from "@/components/public/EventCard";
 
-export default async function MediaPage() {
+export default async function MediaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ share?: string }>;
+}) {
   const session = await participantAuth();
   const viewer = await getMediaViewer(session?.user?.participantId ?? null);
   const pastEvents = await getEventsVisibleUnderMedia(viewer);
+  // Set by the share-link route when a token is unknown, revoked, or points
+  // at an unpublished event — otherwise a dead link would silently dump you
+  // here with no explanation.
+  const shareLinkInvalid = (await searchParams).share === "invalid";
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-16 md:px-8">
+      {shareLinkInvalid ? (
+        <p className="mb-8 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          Deze deel-link is niet (meer) geldig. Vraag de organisator om een nieuwe link.
+        </p>
+      ) : null}
+
       <div className="mb-10">
         <span className="font-mono-label text-accent text-xs">Archief</span>
         <h1 className="font-display mt-2 text-3xl font-medium tracking-tight text-white md:text-4xl">Media</h1>

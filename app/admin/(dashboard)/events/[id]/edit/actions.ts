@@ -19,7 +19,7 @@ export type QuestionItem = {
   order: number;
 };
 
-export type EarlybirdPriceItem = { id: string; deadline: string; price: string };
+export type EarlybirdPriceItem = { id: string; deadline: string; price: string; passengerPrice: string | null };
 
 // The event's own core content fields — everything editable in
 // components/forms/EventFormFields.tsx plus the two registration-window
@@ -64,7 +64,7 @@ type DraftQuestionInput = {
   options?: string;
 };
 
-type DraftEarlybirdPriceInput = { clientKey: string; id?: string; deadline: string; price: string };
+type DraftEarlybirdPriceInput = { clientKey: string; id?: string; deadline: string; price: string; passengerPrice?: string };
 
 type Intent = "draft" | "publish" | "publish-questions";
 
@@ -156,7 +156,13 @@ export async function saveEventEdit(
   }
 
   const earlybirdErrors: Record<string, string> = {};
-  const validatedEarlybirdPrices: { clientKey: string; id?: string; deadline: Date; price: number }[] = [];
+  const validatedEarlybirdPrices: {
+    clientKey: string;
+    id?: string;
+    deadline: Date;
+    price: number;
+    passengerPrice: number | null;
+  }[] = [];
   for (const tier of draftEarlybirdPrices) {
     if (!tier.deadline) {
       earlybirdErrors[tier.clientKey] = "Kies een deadline";
@@ -172,7 +178,19 @@ export async function saveEventEdit(
       earlybirdErrors[tier.clientKey] = "Geef een prijs groter dan 0 op";
       continue;
     }
-    validatedEarlybirdPrices.push({ clientKey: tier.clientKey, id: tier.id, deadline: tierDeadline, price });
+    // Blank means "no separate earlybird for passengers" — the event's
+    // regular passenger price then applies for this tier (see lib/pricing.ts).
+    const rawPassenger = (tier.passengerPrice ?? "").trim();
+    let passengerPrice: number | null = null;
+    if (rawPassenger) {
+      const parsed = Number(rawPassenger);
+      if (Number.isNaN(parsed) || parsed < 0) {
+        earlybirdErrors[tier.clientKey] = "Ongeldige passagiersprijs";
+        continue;
+      }
+      passengerPrice = parsed;
+    }
+    validatedEarlybirdPrices.push({ clientKey: tier.clientKey, id: tier.id, deadline: tierDeadline, price, passengerPrice });
   }
   if (Object.keys(earlybirdErrors).length > 0) return { earlybirdErrors };
 
@@ -249,7 +267,9 @@ export async function saveEventEdit(
       }
 
       for (const tier of validatedEarlybirdPrices) {
-        await tx.earlybirdPrice.create({ data: { eventId: event.id, deadline: tier.deadline, price: tier.price } });
+        await tx.earlybirdPrice.create({
+          data: { eventId: event.id, deadline: tier.deadline, price: tier.price, passengerPrice: tier.passengerPrice },
+        });
       }
 
       return event;
@@ -383,9 +403,14 @@ export async function saveEventEdit(
 
     for (const tier of validatedEarlybirdPrices) {
       if (tier.id) {
-        await tx.earlybirdPrice.update({ where: { id: tier.id }, data: { deadline: tier.deadline, price: tier.price } });
+        await tx.earlybirdPrice.update({
+          where: { id: tier.id },
+          data: { deadline: tier.deadline, price: tier.price, passengerPrice: tier.passengerPrice },
+        });
       } else {
-        await tx.earlybirdPrice.create({ data: { eventId: resolvedEventId!, deadline: tier.deadline, price: tier.price } });
+        await tx.earlybirdPrice.create({
+          data: { eventId: resolvedEventId!, deadline: tier.deadline, price: tier.price, passengerPrice: tier.passengerPrice },
+        });
       }
     }
 
@@ -428,6 +453,7 @@ export async function saveEventEdit(
       id: t.id,
       deadline: t.deadline.toISOString().slice(0, 10),
       price: t.price.toString(),
+      passengerPrice: t.passengerPrice?.toString() ?? null,
     })),
     questionsPublished: freshForm.published,
     deadline: freshForm.deadline ? freshForm.deadline.toISOString().slice(0, 10) : null,

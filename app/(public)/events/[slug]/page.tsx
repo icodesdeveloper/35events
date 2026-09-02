@@ -4,7 +4,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCircleCheck, faImages, faArrowRight } from "@fortawesome/free-solid-svg-icons";
 import { getEventBySlug } from "@/lib/events";
 import { formatDistance, formatDuration, formatEventDate, formatPrice } from "@/lib/format";
-import { getEffectivePrice, getActiveEarlybirdTier } from "@/lib/pricing";
+import { getEffectivePricing } from "@/lib/pricing";
 import CornerBrackets from "@/components/public/CornerBrackets";
 import { auth as participantAuth } from "@/lib/auth/participant";
 import { prisma } from "@/lib/prisma";
@@ -35,12 +35,16 @@ export default async function EventDetailPage({
   const visibleSections = getVisibleSections(event, viewer);
 
   const hasPrice = event.price != null || event.earlybirdPrices.length > 0;
-  const activeEarlybirdTier = getActiveEarlybirdTier(event);
+  const pricing = getEffectivePricing(event);
+  const activeEarlybirdTier = pricing.tier;
+  // Only advertise a passenger rate when the event actually charges one —
+  // an event with passengers disabled (maxPassengers 0) has nothing to show.
+  const showPassengerPrice = event.maxPassengers > 0 && (event.passengerPrice != null || pricing.passengerPrice > 0);
   const stats = [
     event.distanceKm ? formatDistance(event.distanceKm) : null,
     event.durationMinutes ? formatDuration(event.durationMinutes) : null,
-    hasPrice ? `${formatPrice(getEffectivePrice(event))} deelname` : null,
-    event.passengerPrice != null ? `${formatPrice(event.passengerPrice.toString())} passagier` : null,
+    hasPrice ? `${formatPrice(pricing.price)} deelname` : null,
+    showPassengerPrice ? `${formatPrice(pricing.passengerPrice)} passagier` : null,
   ].filter((stat): stat is string => stat !== null);
 
   return (

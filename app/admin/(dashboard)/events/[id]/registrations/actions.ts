@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { storage } from "@/lib/storage";
 import { generateUniquePaymentReference, getExpectedAmount, type PaymentStatus } from "@/lib/payments";
-import { getEffectivePrice } from "@/lib/pricing";
+import { getEffectivePricing } from "@/lib/pricing";
+import { findOrCreateParticipantByEmail } from "@/lib/participants";
 import { notifyPaymentConfirmed } from "@/lib/notifications/payment";
 import { sendMail } from "@/lib/mail/transporter";
 import { registrationConfirmationEmail } from "@/lib/mail/templates";
@@ -25,6 +26,8 @@ export async function updatePaymentStatus(eventId: string, registrationId: strin
 
 export type AdminCreateRegistrationState = { error?: string; fieldErrors?: Record<string, string> };
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // Lets the admin register someone who signed up outside the site (phone,
 // in person, ...) — same data shape as the public flow, minus the vehicle
 // photo, and the admin can set the initial payment status directly instead
@@ -34,7 +37,12 @@ export async function adminCreateRegistration(
   _prevState: AdminCreateRegistrationState,
   formData: FormData,
 ): Promise<AdminCreateRegistrationState> {
-  const participantId = String(formData.get("participantId") ?? "");
+  // Two ways in: pick an existing account, or type an email for someone who
+  // has none (a friend from WhatsApp). The email branch creates a
+  // password-less participant they can reach via the magic-link login.
+  const mode = formData.get("participantMode") === "email" ? "email" : "existing";
+  const newEmail = String(formData.get("newParticipantEmail") ?? "").trim();
+  let participantId = String(formData.get("participantId") ?? "");
   const vehicleMake = String(formData.get("vehicleMake") ?? "").trim();
   const vehicleModel = String(formData.get("vehicleModel") ?? "").trim();
   const vehicleType = String(formData.get("vehicleType") ?? "").trim() || null;
@@ -42,9 +50,18 @@ export async function adminCreateRegistration(
   const passengerCountRaw = Number(formData.get("passengerCount") ?? 0);
   const passengerCount = Number.isFinite(passengerCountRaw) ? Math.max(0, Math.trunc(passengerCountRaw)) : 0;
 
-  if (!participantId) return { fieldErrors: { participantId: "Kies een gebruiker" } };
   if (!vehicleMake) return { fieldErrors: { vehicleMake: "Merk is verplicht" } };
   if (!vehicleModel) return { fieldErrors: { vehicleModel: "Model is verplicht" } };
+
+  if (mode === "email") {
+    if (!EMAIL_PATTERN.test(newEmail)) {
+      return { fieldErrors: { newParticipantEmail: "Geef een geldig e-mailadres op" } };
+    }
+    const { participant: created } = await findOrCreateParticipantByEmail(newEmail);
+    participantId = created.id;
+  } else if (!participantId) {
+    return { fieldErrors: { participantId: "Kies een gebruiker" } };
+  }
 
   const [event, participant, existing] = await Promise.all([
     prisma.event.findUniqueOrThrow({ where: { id: eventId }, include: { earlybirdPrices: true } }),
@@ -58,7 +75,7 @@ export async function adminCreateRegistration(
     return { fieldErrors: { passengerCount: `Max. ${event.maxPassengers} passagier(s) toegelaten voor dit event.` } };
   }
 
-  const price = getEffectivePrice(event);
+  const { price, passengerPrice } = getEffectivePricing(event);
   const paymentReference = await generateUniquePaymentReference();
 
   const registration = await prisma.registration.create({
@@ -70,7 +87,7 @@ export async function adminCreateRegistration(
       vehicleType,
       passengerCount,
       priceSnapshot: price,
-      passengerPriceSnapshot: passengerCount > 0 ? event.passengerPrice : null,
+      passengerPriceSnapshot: passengerCount > 0 ? passengerPrice : null,
       paymentReference,
       paymentStatus,
       addedManually: true,

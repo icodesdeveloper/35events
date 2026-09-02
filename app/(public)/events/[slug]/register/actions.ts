@@ -9,7 +9,7 @@ import { generateUniquePaymentReference, getExpectedAmount } from "@/lib/payment
 import { validateDiscountCode, computeDiscountAmount, DISCOUNT_VALIDATION_MESSAGE } from "@/lib/discounts";
 import { collectQuestionAnswers, type PassengerQuestion } from "@/lib/questionForms";
 import type { QuestionType } from "@/lib/validation/question";
-import { getEffectivePrice } from "@/lib/pricing";
+import { getEffectivePricing } from "@/lib/pricing";
 
 const MAX_VEHICLE_PHOTO_BYTES = 1_000_000;
 import { sendMail } from "@/lib/mail/transporter";
@@ -101,8 +101,9 @@ export async function submitRegistration(
   );
   if (Object.keys(answerFieldErrors).length > 0) return { fieldErrors: answerFieldErrors };
 
-  const price = getEffectivePrice(event);
-  const passengerPrice = event.passengerPrice != null ? Number(event.passengerPrice.toString()) : 0;
+  // Both rates come from the same call so the driver and passenger price can
+  // never be read from different earlybird tiers.
+  const { price, passengerPrice } = getEffectivePricing(event);
   const subtotal = price + passengerCount * passengerPrice;
 
   let discountId: string | undefined;
@@ -150,7 +151,10 @@ export async function submitRegistration(
           vehiclePhotoPath,
           passengerCount,
           priceSnapshot: price,
-          passengerPriceSnapshot: passengerCount > 0 ? event.passengerPrice : null,
+          // Snapshot the rate that was actually charged (earlybird included),
+          // not the event's list price — otherwise the expected payment
+          // recomputed later would not match what the visitor was quoted.
+          passengerPriceSnapshot: passengerCount > 0 ? passengerPrice : null,
           discountCodeId: discountId,
           discountAmountSnapshot: discountId ? discountAmount : null,
           paymentReference,

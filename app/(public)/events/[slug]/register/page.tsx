@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth as participantAuth } from "@/lib/auth/participant";
 import RegistrationForm from "@/components/forms/RegistrationForm";
-import { getEffectivePrice } from "@/lib/pricing";
+import { getEffectivePricing } from "@/lib/pricing";
 
 export default async function EventRegisterPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -40,7 +40,11 @@ export default async function EventRegisterPage({ params }: { params: Promise<{ 
       : [];
 
   const hasPrice = event.price != null || event.earlybirdPrices.length > 0;
-  const price = hasPrice ? String(getEffectivePrice(event)) : null;
+  // Quote the same rates the server will charge on submit (earlybird tier
+  // included), so the total shown in the form matches the payment request.
+  const pricing = getEffectivePricing(event);
+  const price = hasPrice ? String(pricing.price) : null;
+  const hasPassengerPrice = event.passengerPrice != null || pricing.passengerPrice > 0;
 
   return (
     <div className="mx-auto max-w-xl px-4 py-16 md:px-8">
@@ -49,7 +53,7 @@ export default async function EventRegisterPage({ params }: { params: Promise<{ 
       <RegistrationForm
         slug={slug}
         price={price}
-        passengerPrice={event.passengerPrice?.toString() ?? null}
+        passengerPrice={hasPassengerPrice ? String(pricing.passengerPrice) : null}
         maxPassengers={event.maxPassengers}
         questions={questions}
       />

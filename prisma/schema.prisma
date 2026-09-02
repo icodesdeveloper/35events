@@ -98,12 +98,37 @@ model Event {
 
   media           EventMedia[]
   mediaSections   EventMediaSection[]
+  mediaShareLinks EventMediaShareLink[]
   registrations   Registration[]
   questionForm    EventQuestionForm?
   discountCodes   DiscountCode[]
   earlybirdPrices EarlybirdPrice[]
 
   @@index([date])
+}
+
+// A shareable capability URL that grants participant-level access to one
+// event's media without an account — for sending round in WhatsApp to people
+// who registered but never signed up. It lifts a viewer to exactly what a
+// registered participant sees: PARTICIPANTS_ONLY sections become visible,
+// HIDDEN ones deliberately stay hidden, and downloads follow the same rule.
+//
+// The token is stored in plaintext on purpose (unlike ParticipantMagicLinkToken,
+// which is hashed): the admin has to be able to re-copy the same link later,
+// and this grants only media viewing, never account access. Revoke instead of
+// rotating if a link escapes.
+model EventMediaShareLink {
+  id         String    @id @default(cuid())
+  eventId    String
+  token      String    @unique
+  label      String?
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
 }
 
 // A named, independently-visible group of EventMedia within an event (e.g.
@@ -151,6 +176,11 @@ model EarlybirdPrice {
   eventId   String
   deadline  DateTime
   price     Decimal
+  // Optional earlybird rate per passenger. Null means "no separate earlybird
+  // for passengers", and the event's regular passengerPrice applies for the
+  // whole tier — so leaving this empty keeps the pre-existing behaviour where
+  // only the driver got the discount. See lib/pricing.ts.
+  passengerPrice Decimal?
   createdAt DateTime @default(now())
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)

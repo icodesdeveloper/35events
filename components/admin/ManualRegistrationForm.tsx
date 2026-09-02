@@ -23,6 +23,7 @@ export default function ManualRegistrationForm({
   maxPassengers: number;
 }) {
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"existing" | "email">("existing");
   const boundAction = adminCreateRegistration.bind(null, eventId);
   const [state, formAction, pending] = useActionState<AdminCreateRegistrationState, FormData>(boundAction, {});
   const errors = state.fieldErrors ?? {};
@@ -43,23 +44,72 @@ export default function ManualRegistrationForm({
       {open ? (
         <form action={formAction} className="grid grid-cols-1 gap-4 border-t border-slate-200 p-4 sm:grid-cols-2 dark:border-zinc-800">
           <div className="sm:col-span-2">
-            <label className={labelClass}>Gebruiker</label>
-            <SelectField name="participantId" searchable>
-              <option value="">Kies een gebruiker...</option>
-              {participants.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.username} ({p.email})
-                </option>
+            <input type="hidden" name="participantMode" value={mode} />
+
+            <div className="mb-3 inline-flex rounded-lg border border-slate-200 p-0.5 dark:border-zinc-700">
+              {(
+                [
+                  ["existing", "Bestaande gebruiker"],
+                  ["email", "Nieuw via e-mail"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setMode(value)}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    mode === value
+                      ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
+                      : "text-slate-500 hover:text-zinc-900 dark:text-slate-400 dark:hover:text-white"
+                  }`}
+                >
+                  {label}
+                </button>
               ))}
-            </SelectField>
-            {errors.participantId ? (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.participantId}</p>
-            ) : null}
-            {participants.length === 0 ? (
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Iedereen is al geregistreerd voor dit event.
-              </p>
-            ) : null}
+            </div>
+
+            {mode === "existing" ? (
+              <>
+                <label className={labelClass}>Gebruiker</label>
+                <SelectField name="participantId" searchable>
+                  <option value="">Kies een gebruiker...</option>
+                  {participants.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.username} ({p.email})
+                    </option>
+                  ))}
+                </SelectField>
+                {errors.participantId ? (
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.participantId}</p>
+                ) : null}
+                {participants.length === 0 ? (
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Iedereen is al geregistreerd voor dit event.
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <label className={labelClass} htmlFor="newParticipantEmail">
+                  E-mailadres
+                </label>
+                <input
+                  id="newParticipantEmail"
+                  name="newParticipantEmail"
+                  type="email"
+                  placeholder="vriend@voorbeeld.be"
+                  className={fieldClass}
+                />
+                {errors.newParticipantEmail ? (
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{errors.newParticipantEmail}</p>
+                ) : (
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Maakt een account zonder wachtwoord aan. Deze persoon krijgt de bevestigingsmail en kan
+                    inloggen via een login-link. Bestaat het adres al, dan wordt dat account gebruikt.
+                  </p>
+                )}
+              </>
+            )}
           </div>
 
           <div>

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { Event, EventMedia, EventMediaSection } from "@prisma/client";
 import { getRegisteredEventIds } from "@/lib/events";
+import { getSharedEventIds } from "@/lib/mediaShare";
 
 export type MediaVisibility = "PUBLIC" | "PARTICIPANTS_ONLY" | "HIDDEN";
 export type DownloadPermission = "EVERYONE" | "PARTICIPANTS_ONLY" | "NOBODY";
@@ -29,12 +30,28 @@ export function resolveEffectiveDownloadPermission(
   return (section.inheritDownload ? event.downloadPermission : section.downloadPermission) as DownloadPermission;
 }
 
-export type MediaViewer = { participantId: string | null; registeredEventIds: Set<string> };
+export type MediaViewer = {
+  participantId: string | null;
+  registeredEventIds: Set<string>;
+  // Events unlocked by a media share link (see lib/mediaShare.ts) — the
+  // holder has no account, but for this event they count as a participant.
+  sharedEventIds: Set<string>;
+};
+
+// "Counts as a participant for this event": either genuinely registered, or
+// holding a valid share link for it. Single chokepoint so view and download
+// can never drift apart on what participant-level means.
+function hasParticipantAccess(eventId: string, viewer: MediaViewer): boolean {
+  if (viewer.sharedEventIds.has(eventId)) return true;
+  return viewer.participantId !== null && viewer.registeredEventIds.has(eventId);
+}
 
 export function canViewVisibility(visibility: MediaVisibility, eventId: string, viewer: MediaViewer): boolean {
   if (visibility === "PUBLIC") return true;
+  // HIDDEN stays hidden even for a share-link holder — the link lifts someone
+  // to participant level, it is not an admin backdoor.
   if (visibility === "HIDDEN") return false;
-  return viewer.participantId !== null && viewer.registeredEventIds.has(eventId);
+  return hasParticipantAccess(eventId, viewer);
 }
 
 // Downloading is always bounded by visibility — someone who can't view a
@@ -48,7 +65,7 @@ export function canDownload(
   if (!canViewVisibility(visibility, eventId, viewer)) return false;
   if (downloadPermission === "EVERYONE") return true;
   if (downloadPermission === "NOBODY") return false;
-  return viewer.participantId !== null && viewer.registeredEventIds.has(eventId);
+  return hasParticipantAccess(eventId, viewer);
 }
 
 export type VisibleMediaSection = EventMediaSection & {
@@ -78,9 +95,14 @@ export function getVisibleSections(
     .sort((a, b) => a.order - b.order);
 }
 
+// Reads the share cookie itself rather than making every call site pass it —
+// the same viewer must come out whether this is called from a page or from
+// the /api/media file route, and a call site that forgot would silently 404
+// a share link's images.
 export async function getMediaViewer(participantId: string | null): Promise<MediaViewer> {
-  if (!participantId) return { participantId: null, registeredEventIds: new Set() };
-  return { participantId, registeredEventIds: await getRegisteredEventIds(participantId) };
+  const sharedEventIds = await getSharedEventIds();
+  if (!participantId) return { participantId: null, registeredEventIds: new Set(), sharedEventIds };
+  return { participantId, registeredEventIds: await getRegisteredEventIds(participantId), sharedEventIds };
 }
 
 // Replaces the old getPastEvents() (lib/events.ts) as the source for the

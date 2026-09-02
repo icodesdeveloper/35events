@@ -32,10 +32,10 @@ type DraftQuestion = {
   options: string;
 };
 
-type DraftEarlybirdPrice = { clientKey: string; id?: string; deadline: string; price: string };
+type DraftEarlybirdPrice = { clientKey: string; id?: string; deadline: string; price: string; passengerPrice: string };
 
 function toEarlybirdDraft(e: EarlybirdPriceItem): DraftEarlybirdPrice {
-  return { clientKey: e.id, id: e.id, deadline: e.deadline, price: e.price };
+  return { clientKey: e.id, id: e.id, deadline: e.deadline, price: e.price, passengerPrice: e.passengerPrice ?? "" };
 }
 
 function toDateInputValue(date: Date | null | undefined): string {
@@ -141,7 +141,7 @@ export default function EventEditWorkspace({
   }
 
   function addEarlybirdRow() {
-    setEarlybirdPrices((prev) => [...prev, { clientKey: crypto.randomUUID(), deadline: "", price: "" }]);
+    setEarlybirdPrices((prev) => [...prev, { clientKey: crypto.randomUUID(), deadline: "", price: "", passengerPrice: "" }]);
   }
 
   async function handleUnpublishQuestions() {
@@ -175,7 +175,7 @@ export default function EventEditWorkspace({
 
   const busy = pending || unpublishPending || discardPending;
   const earlybirdPricesJson = JSON.stringify(
-    earlybirdPrices.map(({ clientKey, id, deadline, price }) => ({ clientKey, id, deadline, price })),
+    earlybirdPrices.map(({ clientKey, id, deadline, price, passengerPrice }) => ({ clientKey, id, deadline, price, passengerPrice })),
   );
   const questionsJson = JSON.stringify(
     questions.map(({ clientKey, id, type, label, required, perPassenger, options }) => ({
@@ -307,6 +307,18 @@ export default function EventEditWorkspace({
                     min="0"
                     value={tier.price}
                     onChange={(e) => updateEarlybirdRow(tier.clientKey, { price: e.target.value })}
+                    className={fieldClass}
+                  />
+                </div>
+                <div className="w-36">
+                  <label className={labelClass}>Passagier (&euro;)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="gewone prijs"
+                    value={tier.passengerPrice}
+                    onChange={(e) => updateEarlybirdRow(tier.clientKey, { passengerPrice: e.target.value })}
                     className={fieldClass}
                   />
                 </div>
