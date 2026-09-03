@@ -66,6 +66,12 @@ model Event {
   price                 Decimal?
   passengerPrice        Decimal?
   maxPassengers         Int       @default(0)
+  // Prefix for this event's payment references, e.g. "TR26-" giving TR26-A43,
+  // TR26-B49, ... Filled with a suggestion derived from the name and year
+  // when the admin leaves it blank (see lib/paymentReference.ts). Null only
+  // for events created before this existed; those keep their old random
+  // codes and get a prefix the next time they are saved.
+  paymentReferencePrefix String?
   coverImagePath        String?
   published             Boolean   @default(false)
   registrationOpen      Boolean   @default(false)

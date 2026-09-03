@@ -13,6 +13,7 @@ const BLANK_EVENT: EventFormData = {
   price: null,
   passengerPrice: null,
   maxPassengers: 0,
+  paymentReferencePrefix: null,
   coverImagePath: null,
   published: false,
   registrationOpen: false,

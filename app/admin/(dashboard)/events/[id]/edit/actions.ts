@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { suggestPaymentPrefix } from "@/lib/paymentReference";
 import { parseEventFormData } from "@/lib/validation/event";
 import { questionFormSchema, parseOptions, type QuestionType } from "@/lib/validation/question";
 import { saveUploadedFile, storage } from "@/lib/storage";
@@ -35,6 +36,7 @@ export type EventDraftData = {
   price: number | null;
   passengerPrice: number | null;
   maxPassengers: number;
+  paymentReferencePrefix: string;
   registrationStartDate: string | null;
   registrationEndDate: string | null;
   coverImagePath?: string;
@@ -205,6 +207,10 @@ export async function saveEventEdit(
     price: data.price ?? null,
     passengerPrice: data.passengerPrice ?? null,
     maxPassengers: data.maxPassengers,
+    // Left blank, fall back to a suggestion built from the submitted name and
+    // date — that is what makes "leave it empty" do the sensible thing rather
+    // than silently reverting the event to random codes.
+    paymentReferencePrefix: data.paymentReferencePrefix || suggestPaymentPrefix(data.name, data.date),
     registrationStartDate: data.registrationStartDate ?? null,
     registrationEndDate: data.registrationEndDate ?? null,
   };
@@ -237,6 +243,7 @@ export async function saveEventEdit(
           price: contentFields.price,
           passengerPrice: contentFields.passengerPrice,
           maxPassengers: contentFields.maxPassengers,
+          paymentReferencePrefix: contentFields.paymentReferencePrefix,
           registrationStartDate: contentFields.registrationStartDate
             ? new Date(contentFields.registrationStartDate)
             : null,
@@ -347,6 +354,7 @@ export async function saveEventEdit(
               price: contentFields.price,
               passengerPrice: contentFields.passengerPrice,
               maxPassengers: contentFields.maxPassengers,
+              paymentReferencePrefix: contentFields.paymentReferencePrefix,
               registrationStartDate: contentFields.registrationStartDate
                 ? new Date(contentFields.registrationStartDate)
                 : null,

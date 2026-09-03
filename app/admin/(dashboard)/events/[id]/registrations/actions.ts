@@ -76,7 +76,7 @@ export async function adminCreateRegistration(
   }
 
   const { price, passengerPrice } = getEffectivePricing(event);
-  const paymentReference = await generateUniquePaymentReference();
+  const paymentReference = await generateUniquePaymentReference(event);
 
   const registration = await prisma.registration.create({
     data: {

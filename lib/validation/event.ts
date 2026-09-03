@@ -38,6 +38,12 @@ export const eventFormSchema = z
       (value) => (value === "" || value === null || value === undefined ? 0 : Number(value)),
       z.number().int().min(0, "Kan niet negatief zijn"),
     ),
+    // Uppercased and trimmed so the codes stay consistent no matter how it
+    // was typed; blank means "derive one from the name and year on save".
+    paymentReferencePrefix: z.preprocess(
+      (value) => (typeof value === "string" ? value.trim().toUpperCase() : ""),
+      z.string().max(12, "Maximaal 12 tekens"),
+    ),
     published: z.preprocess((value) => value === "on" || value === true, z.boolean()),
     registrationOpen: z.preprocess((value) => value === "on" || value === true, z.boolean()),
     registrationStartDate: z.string().optional(),
@@ -71,6 +77,7 @@ export function parseEventFormData(
     price: formData.get("price") || undefined,
     passengerPrice: formData.get("passengerPrice") || undefined,
     maxPassengers: formData.get("maxPassengers") || undefined,
+    paymentReferencePrefix: formData.get("paymentReferencePrefix") ?? "",
     published: formData.get("published"),
     registrationOpen: formData.get("registrationOpen"),
     registrationStartDate: formData.get("registrationStartDate") || undefined,

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { isWellFormedReference } from "@/lib/paymentReference";
 import { getExpectedAmount, getPaymentBalance, type PaymentBalanceStatus } from "@/lib/payments";
 import { notifyPaymentConfirmed } from "@/lib/notifications/payment";
 
@@ -29,7 +30,21 @@ export async function recordPayment(paymentReferenceRaw: string, amountRaw: stri
     where: { paymentReference },
     include: { participant: true, event: { select: { id: true, name: true } }, payments: true },
   });
-  if (!registration) return { ok: false, error: `Geen deelname gevonden met code "${paymentReference}".` };
+  if (!registration) {
+    // Separate the two reasons a code can miss. A prefixed code carries check
+    // digits, so a failing checksum means it was mistyped rather than that it
+    // belongs to nobody — worth saying, because the fix is different (look
+    // again at the transfer vs. this person never registered). Codes from
+    // before per-event prefixes have no checksum and fall through to the
+    // generic message.
+    const looksMistyped = /^[A-Z0-9]+-[A-Z]+[0-9]{2}$/.test(paymentReference) && !isWellFormedReference(paymentReference);
+    return {
+      ok: false,
+      error: looksMistyped
+        ? `De code "${paymentReference}" klopt niet — de controlecijfers komen niet overeen. Kijk de code na op het overschrijvingsbericht.`
+        : `Geen deelname gevonden met code "${paymentReference}".`,
+    };
+  }
 
   await prisma.payment.create({ data: { registrationId: registration.id, amount } });
 

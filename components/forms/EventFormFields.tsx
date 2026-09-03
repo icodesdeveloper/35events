@@ -1,6 +1,7 @@
 import type { Event } from "@prisma/client";
 import FileDropzone from "@/components/admin/FileDropzone";
 import DatePickerField from "@/components/admin/DatePickerField";
+import { suggestPaymentPrefix, buildPaymentReference } from "@/lib/paymentReference";
 import RichTextEditor from "@/components/admin/RichTextEditor";
 
 // Prisma's Decimal is a class instance, not a plain object — it can't cross
@@ -27,6 +28,14 @@ export default function EventFormFields({
   event?: EventFormData;
   errors: Record<string, string>;
 }) {
+  // Best-effort preview from the already-saved name/date. The authoritative
+  // suggestion is applied server-side on save (see the edit action), using
+  // the name and date actually submitted — so a brand-new event, where there
+  // is nothing to derive from yet, still ends up with the right prefix.
+  const suggestedPrefix = event?.name ? suggestPaymentPrefix(event.name, event.date) : null;
+  const previewPrefix = event?.paymentReferencePrefix?.trim() || suggestedPrefix || "TR26-";
+  const examples = [1, 2, 3].map((sequence) => buildPaymentReference(previewPrefix, sequence));
+
   return (
     <div className="max-w-2xl space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -143,6 +152,31 @@ export default function EventFormFields({
         />
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           0 = geen passagiers toegelaten bij registratie voor dit event.
+        </p>
+      </div>
+
+      <div>
+        <label className={labelClass} htmlFor="paymentReferencePrefix">
+          Prefix betaalcode
+        </label>
+        <input
+          id="paymentReferencePrefix"
+          name="paymentReferencePrefix"
+          defaultValue={event?.paymentReferencePrefix ?? ""}
+          placeholder={suggestedPrefix ?? "wordt voorgesteld bij opslaan"}
+          className={fieldClass}
+        />
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          Elke deelnemer krijgt deze prefix met een oplopende code erachter:{" "}
+          <span className="font-mono">{examples.join(", ")}</span> … De laatste twee cijfers zijn een controlegetal,
+          zodat één vertypt teken nooit op de code van een andere deelnemer uitkomt.{" "}
+          {suggestedPrefix ? (
+            <>
+              Leeg laten neemt <span className="font-mono">{suggestedPrefix}</span> over.
+            </>
+          ) : (
+            "Leeg laten stelt er zelf een voor op basis van de naam en het jaartal."
+          )}
         </p>
       </div>
 

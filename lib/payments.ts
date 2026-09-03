@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { buildPaymentReference } from "@/lib/paymentReference";
 
 export type PaymentStatus = "PENDING_PAYMENT" | "CONFIRMED" | "CANCELLED";
 
@@ -19,9 +20,29 @@ function randomReferenceCandidate(): string {
 // insert landing between the check and the create, but the DB's unique
 // constraint on Registration.paymentReference is the backstop for that —
 // registration volume here makes the race astronomically unlikely anyway.
-export async function generateUniquePaymentReference(): Promise<string> {
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const candidate = randomReferenceCandidate();
+export async function generateUniquePaymentReference(event?: {
+  id: string;
+  paymentReferencePrefix: string | null;
+}): Promise<string> {
+  // Events from before per-event prefixes existed (and any event whose prefix
+  // was cleared) keep the old random codes, so nothing that is already
+  // printed on a bank transfer changes meaning.
+  const prefix = event?.paymentReferencePrefix?.trim();
+  if (!event || !prefix) {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const candidate = randomReferenceCandidate();
+      const existing = await prisma.registration.findUnique({ where: { paymentReference: candidate } });
+      if (!existing) return candidate;
+    }
+    throw new Error("Kon geen unieke betaalcode genereren");
+  }
+
+  // Walk the sequence from the current registration count rather than
+  // restarting at 1: deleting a registration must not hand its code to the
+  // next person, or a stale bank transfer would credit the wrong participant.
+  const used = await prisma.registration.count({ where: { eventId: event.id } });
+  for (let sequence = used + 1; sequence <= used + 200; sequence++) {
+    const candidate = buildPaymentReference(prefix, sequence);
     const existing = await prisma.registration.findUnique({ where: { paymentReference: candidate } });
     if (!existing) return candidate;
   }

@@ -124,7 +124,7 @@ export async function submitRegistration(
     `registrations/${event.id}`,
     MAX_VEHICLE_PHOTO_BYTES,
   );
-  const paymentReference = await generateUniquePaymentReference();
+  const paymentReference = await generateUniquePaymentReference(event);
 
   let registration;
   try {
