@@ -11,6 +11,7 @@ const globalForScheduler = globalThis as unknown as {
   campaignSchedulerStarted?: boolean;
   registrationWindowSchedulerStarted?: boolean;
   mediaVisibilitySchedulerStarted?: boolean;
+  outboxSchedulerStarted?: boolean;
 };
 
 export async function register() {
@@ -69,6 +70,21 @@ export async function register() {
     };
     tick();
     setInterval(tick, FIVE_MINUTES_MS);
+  }
+
+  if (!globalForScheduler.outboxSchedulerStarted) {
+    globalForScheduler.outboxSchedulerStarted = true;
+
+    const { runOutboxCheck } = await import("@/lib/notifications/outbox");
+    const tick = () => {
+      runOutboxCheck().catch((error) => {
+        console.error("[outbox] check failed:", error);
+      });
+    };
+    // Also on boot: a restart is exactly when a backlog from a mail outage is
+    // waiting, and nobody should have to sit out the first hour for it.
+    tick();
+    setInterval(tick, ONE_HOUR_MS);
   }
 
   if (!globalForScheduler.mediaVisibilitySchedulerStarted) {

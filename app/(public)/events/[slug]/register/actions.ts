@@ -12,7 +12,7 @@ import type { QuestionType } from "@/lib/validation/question";
 import { getEffectivePricing } from "@/lib/pricing";
 
 const MAX_VEHICLE_PHOTO_BYTES = 1_000_000;
-import { sendMail } from "@/lib/mail/transporter";
+import { sendMailInBackground } from "@/lib/mail/transporter";
 import { registrationConfirmationEmail } from "@/lib/mail/templates";
 import { SITE_URL } from "@/lib/site";
 import { getSettings } from "@/lib/settings";
@@ -191,7 +191,10 @@ export async function submitRegistration(
       expectedAmount,
       { iban: settings.bankAccountIban, accountName: settings.bankAccountName },
     );
-    await sendMail({ to: session.user.email, subject, text, html }).catch(() => {});
+    // Deliberately not awaited: the registration is already committed, so the
+    // participant should land on the success page immediately instead of
+    // waiting on the mail server.
+    sendMailInBackground({ to: session.user.email, subject, text, html });
   }
 
   redirect(`/events/${slug}/register/success`);

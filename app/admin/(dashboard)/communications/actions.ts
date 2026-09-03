@@ -10,7 +10,7 @@ import { sanitizeContentHtml } from "@/lib/sanitizeHtml";
 import { resolveAudience, type AudienceFilter, type CampaignRecipient } from "@/lib/campaigns";
 import type { PaymentStatus } from "@/lib/payments";
 
-export type CampaignFormState = { error?: string; fieldErrors?: Record<string, string> };
+export type CampaignFormState = { error?: string; notice?: string; fieldErrors?: Record<string, string> };
 
 function readAudienceFilter(formData: FormData): AudienceFilter {
   const mode = formData.get("audienceMode");
@@ -82,14 +82,19 @@ export async function saveCampaign(
     ? await prisma.campaign.update({ where: { id: campaignId }, data })
     : await prisma.campaign.create({ data });
 
+  let queued = 0;
   if (intent === "send") {
-    await sendResolvedCampaign(campaign.id, subject, bodyHtml, recipients);
+    ({ queued } = await sendResolvedCampaign(campaign.id, subject, bodyHtml, recipients));
   }
 
   revalidatePath("/admin/communications");
   revalidatePath(`/admin/communications/${campaign.id}`);
   if (!campaignId) redirect(`/admin/communications/${campaign.id}`);
-  return {};
+  return queued > 0
+    ? {
+        notice: `${queued} van de ${recipients.length} mails kon de mailserver niet aannemen. Ze staan in de outbox en worden elk uur opnieuw geprobeerd tot het lukt.`,
+      }
+    : {};
 }
 
 // Shared by saveCampaign's "send" intent and the scheduled-send background
@@ -100,16 +105,27 @@ export async function sendResolvedCampaign(
   subject: string,
   bodyHtml: string,
   recipients: CampaignRecipient[],
-): Promise<void> {
+): Promise<{ queued: number }> {
   const { subject: mailSubject, text, html } = await campaignEmail(subject, bodyHtml);
-  await Promise.all(
-    recipients.map((recipient) => sendMail({ to: recipient.email, subject: mailSubject, text, html }).catch(() => {})),
+  const results = await Promise.all(
+    recipients.map((recipient) =>
+      sendMail({ to: recipient.email, subject: mailSubject, text, html, source: "communicatie" }).catch(() => ({
+        delivered: false,
+        queued: false,
+      })),
+    ),
   );
+  // Anything SMTP refused is now in the outbox rather than lost, so the
+  // campaign still counts as sent — the count is what the admin needs to be
+  // told about.
+  const queued = results.filter((result) => result.queued).length;
 
   await prisma.campaign.update({
     where: { id: campaignId },
     data: { status: "SENT", sentAt: new Date(), sentCount: recipients.length },
   });
+
+  return { queued };
 }
 
 export async function unscheduleCampaign(campaignId: string) {
@@ -139,4 +155,17 @@ export async function previewAudience(
   if (mode === "EVENTS") filter = { mode: "EVENTS", eventIds, statuses: statuses as PaymentStatus[] };
   if (mode === "SPECIFIC_PARTICIPANTS") filter = { mode: "SPECIFIC_PARTICIPANTS", participantIds };
   return resolveAudience(filter);
+}
+
+// Outbox: mail that SMTP refused, from anywhere in the app. Retried hourly by
+// lib/notifications/outbox.ts; these let the admin push or drop one by hand.
+export async function retryOutboxNow() {
+  const { runOutboxCheck } = await import("@/lib/notifications/outbox");
+  await runOutboxCheck();
+  revalidatePath("/admin/communications");
+}
+
+export async function deleteOutboxMail(mailId: string) {
+  await prisma.outboundMail.delete({ where: { id: mailId } }).catch(() => {});
+  revalidatePath("/admin/communications");
 }

@@ -54,6 +54,31 @@ model ParticipantMagicLinkToken {
   @@index([participantId])
 }
 
+// Mail that could not be handed to the SMTP server. Every send in the app
+// goes through lib/mail/transporter.ts, so a failure anywhere — registration
+// confirmation, login link, campaign — lands here instead of vanishing into
+// a swallowed catch. lib/notifications/outbox.ts retries the queue hourly,
+// and because the rows live in the database the backlog survives a restart.
+model OutboundMail {
+  id      String @id @default(cuid())
+  to      String
+  subject String
+  text    String
+  html    String
+  // Free-form label telling the admin where a stuck mail came from, e.g.
+  // "registratiebevestiging" or "communicatie".
+  source  String?
+
+  status        String    @default("PENDING") // PENDING | SENT
+  attempts      Int       @default(0)
+  lastError     String?
+  lastAttemptAt DateTime?
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([status, createdAt])
+}
+
 model Event {
   id                    String    @id @default(cuid())
   slug                  String    @unique

@@ -7,7 +7,7 @@ import { generateUniquePaymentReference, getExpectedAmount, type PaymentStatus }
 import { getEffectivePricing } from "@/lib/pricing";
 import { findOrCreateParticipantByEmail } from "@/lib/participants";
 import { notifyPaymentConfirmed } from "@/lib/notifications/payment";
-import { sendMail } from "@/lib/mail/transporter";
+import { sendMailInBackground } from "@/lib/mail/transporter";
 import { registrationConfirmationEmail } from "@/lib/mail/templates";
 import { SITE_URL } from "@/lib/site";
 import { getSettings } from "@/lib/settings";
@@ -107,7 +107,7 @@ export async function adminCreateRegistration(
         expectedAmount,
         { iban: settings.bankAccountIban, accountName: settings.bankAccountName },
       );
-      await sendMail({ to: participant.email, subject, text, html }).catch(() => {});
+      sendMailInBackground({ to: participant.email, subject, text, html });
     }
   }
 

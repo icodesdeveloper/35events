@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { deleteCampaign } from "@/app/admin/(dashboard)/communications/actions";
 import ConfirmSubmitButton from "@/components/admin/ConfirmSubmitButton";
 import Tooltip from "@/components/admin/Tooltip";
+import MailOutboxPanel from "@/components/admin/MailOutboxPanel";
 
 const STATUS_LABEL: Record<string, string> = { DRAFT: "Concept", SCHEDULED: "Gepland", SENT: "Verzonden" };
 const STATUS_CLASS: Record<string, string> = {
@@ -22,7 +23,12 @@ const dateTimeFormatter = new Intl.DateTimeFormat("nl-BE", {
 });
 
 export default async function CommunicationsPage() {
-  const campaigns = await prisma.campaign.findMany({ orderBy: { updatedAt: "desc" } });
+  const [campaigns, outbox] = await Promise.all([
+    prisma.campaign.findMany({ orderBy: { updatedAt: "desc" } }),
+    // Everything still stuck, wherever in the app it came from — not just
+    // campaigns, so this page is the one place to check on mail delivery.
+    prisma.outboundMail.findMany({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" }, take: 50 }),
+  ]);
 
   return (
     <div>
@@ -36,6 +42,8 @@ export default async function CommunicationsPage() {
           Nieuw bericht
         </Link>
       </div>
+
+      <MailOutboxPanel mails={outbox} />
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <table className="w-full text-left text-sm">

@@ -228,6 +228,11 @@ export default function CommunicationComposer({
       </div>
 
       {state.error ? <p className="text-sm text-red-600 dark:text-red-400">{state.error}</p> : null}
+      {state.notice ? (
+        <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+          {state.notice}
+        </p>
+      ) : null}
 
       <section>
         <h2 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-white">Doelgroep</h2>
