@@ -9,6 +9,7 @@ import CornerBrackets from "@/components/public/CornerBrackets";
 import { auth as participantAuth } from "@/lib/auth/participant";
 import { prisma } from "@/lib/prisma";
 import { getMediaViewer, getVisibleSections } from "@/lib/media";
+import PaymentDueBanner from "@/components/public/PaymentDueBanner";
 
 const PAYMENT_STATUS_LABEL: Record<string, string> = {
   PENDING_PAYMENT: "Betaling in afwachting",
@@ -81,6 +82,10 @@ export default async function EventDetailPage({
           <p className="font-mono-label text-accent mt-2 text-xs">
             Vroegboekprijs geldig tot {formatEventDate(activeEarlybirdTier.deadline)}
           </p>
+        ) : null}
+
+        {registration ? (
+          <PaymentDueBanner participantId={registration.participantId} eventId={event.id} className="mt-8" />
         ) : null}
 
         {registration ? (

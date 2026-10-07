@@ -20,6 +20,8 @@ import {
 
 export type RichTextEditorHandle = {
   setContent: (html: string) => void;
+  // Inserts plain text at the cursor (or over the selection).
+  insertText: (text: string) => void;
 };
 
 const toolbarButtonClass = (active: boolean) =>
@@ -57,6 +59,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, { name: string; defaultV
         setContent: (nextHtml: string) => {
           editor?.commands.setContent(nextHtml);
           setHtml(nextHtml);
+        },
+        insertText: (text: string) => {
+          editor?.chain().focus().insertContent({ type: "text", text }).run();
         },
       }),
       [editor],

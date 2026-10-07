@@ -108,6 +108,10 @@ export async function adminCreateRegistration(
         { iban: settings.bankAccountIban, accountName: settings.bankAccountName },
       );
       sendMailInBackground({ to: participant.email, subject, text, html });
+      // This mail carries the code and amount, so it counts as payment info.
+      if (expectedAmount > 0) {
+        await prisma.registration.update({ where: { id: registration.id }, data: { paymentInfoSentAt: new Date() } });
+      }
     }
   }
 

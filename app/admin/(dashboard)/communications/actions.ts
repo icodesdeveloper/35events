@@ -7,7 +7,20 @@ import { prisma } from "@/lib/prisma";
 import { sendMail } from "@/lib/mail/transporter";
 import { campaignEmail } from "@/lib/mail/templates";
 import { sanitizeContentHtml } from "@/lib/sanitizeHtml";
-import { resolveAudience, type AudienceFilter, type CampaignRecipient } from "@/lib/campaigns";
+import {
+  resolveAudience,
+  resolveRecipientVariables,
+  getSingleEventId,
+  type AudienceFilter,
+  type CampaignRecipient,
+} from "@/lib/campaigns";
+import {
+  applyVariables,
+  findVariableKeys,
+  validateVariableUsage,
+  PAYMENT_CODE_VARIABLE,
+} from "@/lib/campaignVariables";
+import { getSettings } from "@/lib/settings";
 import type { PaymentStatus } from "@/lib/payments";
 
 export type CampaignFormState = { error?: string; notice?: string; fieldErrors?: Record<string, string> };
@@ -25,6 +38,10 @@ function readAudienceFilter(formData: FormData): AudienceFilter {
     return { mode: "SPECIFIC_PARTICIPANTS", participantIds: formData.getAll("participantIds").map(String) };
   }
   return { mode: "ALL_PARTICIPANTS" };
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 // Single save path for the composer — which of the three buttons ("Concept
@@ -65,6 +82,14 @@ export async function saveCampaign(
   if (intent !== "draft") {
     recipients = await resolveAudience(filter);
     if (recipients.length === 0) return { error: "Geen ontvangers gevonden voor deze doelgroep." };
+
+    const settings = await getSettings();
+    const variableError = validateVariableUsage(`${subject} ${bodyHtml}`, {
+      singleEvent: getSingleEventId(filter) !== null,
+      hasIban: Boolean(settings.bankAccountIban),
+      hasAccountName: Boolean(settings.bankAccountName),
+    });
+    if (variableError) return { error: variableError };
   }
 
   const data = {
@@ -84,7 +109,7 @@ export async function saveCampaign(
 
   let queued = 0;
   if (intent === "send") {
-    ({ queued } = await sendResolvedCampaign(campaign.id, subject, bodyHtml, recipients));
+    ({ queued } = await sendResolvedCampaign(campaign.id, subject, bodyHtml, recipients, filter));
   }
 
   revalidatePath("/admin/communications");
@@ -99,22 +124,54 @@ export async function saveCampaign(
 
 // Shared by saveCampaign's "send" intent and the scheduled-send background
 // check (lib/notifications/campaigns.ts) — fires the mails and marks the row
-// SENT.
+// SENT. A message without variables is rendered once and reused; one with
+// variables (lib/campaignVariables.ts) is rendered per recipient.
 export async function sendResolvedCampaign(
   campaignId: string,
   subject: string,
   bodyHtml: string,
   recipients: CampaignRecipient[],
+  filter: AudienceFilter,
 ): Promise<{ queued: number }> {
-  const { subject: mailSubject, text, html } = await campaignEmail(subject, bodyHtml);
+  const usedVariables = findVariableKeys(`${subject} ${bodyHtml}`);
+  const variables = usedVariables.length > 0 ? await resolveRecipientVariables(filter, recipients) : null;
+  const shared = variables ? null : await campaignEmail(subject, bodyHtml);
+
   const results = await Promise.all(
-    recipients.map((recipient) =>
-      sendMail({ to: recipient.email, subject: mailSubject, text, html, source: "communicatie" }).catch(() => ({
-        delivered: false,
-        queued: false,
-      })),
-    ),
+    recipients.map(async (recipient) => {
+      try {
+        const values = variables?.get(recipient.id)?.values ?? {};
+        const mail =
+          shared ??
+          (await campaignEmail(applyVariables(subject, values), applyVariables(bodyHtml, values, escapeHtml)));
+        return await sendMail({
+          to: recipient.email,
+          subject: mail.subject,
+          text: mail.text,
+          html: mail.html,
+          source: "communicatie",
+        });
+      } catch {
+        return { delivered: false, queued: false };
+      }
+    }),
   );
+
+  // The payment code went out to these registrations, which is what the
+  // "betalingsinfo gemaild" marker on the registrations page reports.
+  if (variables && usedVariables.includes(PAYMENT_CODE_VARIABLE)) {
+    const registrationIds = recipients
+      .filter((_recipient, index) => results[index].delivered || results[index].queued)
+      .map((recipient) => variables.get(recipient.id)?.registrationId)
+      .filter((id): id is string => Boolean(id));
+    if (registrationIds.length > 0) {
+      await prisma.registration.updateMany({
+        where: { id: { in: registrationIds } },
+        data: { paymentInfoSentAt: new Date() },
+      });
+    }
+  }
+
   // Anything SMTP refused is now in the outbox rather than lost, so the
   // campaign still counts as sent — the count is what the admin needs to be
   // told about.

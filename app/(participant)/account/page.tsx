@@ -8,6 +8,7 @@ import { formatEventDate, formatPrice } from "@/lib/format";
 import { getExpectedAmount, getPaymentBalance, type PaymentBalanceStatus } from "@/lib/payments";
 import { isRegistrationComplete, type PassengerQuestion } from "@/lib/questionForms";
 import type { QuestionType } from "@/lib/validation/question";
+import PaymentDueBanner from "@/components/public/PaymentDueBanner";
 
 const PAYMENT_STATUS_LABEL: Record<string, string> = {
   PENDING_PAYMENT: "Betaling in afwachting",
@@ -61,6 +62,8 @@ export default async function AccountPage() {
           </button>
         </form>
       </div>
+
+      <PaymentDueBanner participantId={session.user.participantId} className="mb-8" />
 
       <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-white">Mijn registraties</h2>
       {registrations.length === 0 ? (

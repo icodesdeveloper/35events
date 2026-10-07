@@ -12,7 +12,8 @@ export async function runScheduledCampaignsCheck(): Promise<void> {
   });
 
   for (const campaign of due) {
-    const recipients = await resolveAudience(parseAudienceFilter(campaign));
-    await sendResolvedCampaign(campaign.id, campaign.subject, campaign.bodyHtml, recipients);
+    const filter = parseAudienceFilter(campaign);
+    const recipients = await resolveAudience(filter);
+    await sendResolvedCampaign(campaign.id, campaign.subject, campaign.bodyHtml, recipients, filter);
   }
 }

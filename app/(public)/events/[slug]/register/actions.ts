@@ -195,6 +195,10 @@ export async function submitRegistration(
     // participant should land on the success page immediately instead of
     // waiting on the mail server.
     sendMailInBackground({ to: session.user.email, subject, text, html });
+    // This mail carries the code and amount, so it counts as payment info.
+    if (expectedAmount > 0) {
+      await prisma.registration.update({ where: { id: registration.id }, data: { paymentInfoSentAt: new Date() } });
+    }
   }
 
   redirect(`/events/${slug}/register/success`);

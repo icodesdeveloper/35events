@@ -1,13 +1,15 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getSettings } from "@/lib/settings";
 import CommunicationComposer, { type CampaignData } from "@/components/admin/CommunicationComposer";
 
 export default async function EditCommunicationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [campaign, events, participants] = await Promise.all([
+  const [campaign, events, participants, settings] = await Promise.all([
     prisma.campaign.findUnique({ where: { id } }),
     prisma.event.findMany({ select: { id: true, name: true, date: true }, orderBy: { date: "desc" } }),
     prisma.participant.findMany({ select: { id: true, username: true, email: true }, orderBy: { username: "asc" } }),
+    getSettings(),
   ]);
   if (!campaign) notFound();
 
@@ -25,5 +27,12 @@ export default async function EditCommunicationPage({ params }: { params: Promis
     sentCount: campaign.sentCount,
   };
 
-  return <CommunicationComposer campaign={data} events={events} participants={participants} />;
+  return (
+    <CommunicationComposer
+      campaign={data}
+      events={events}
+      participants={participants}
+      bankAccount={{ iban: settings.bankAccountIban, accountName: settings.bankAccountName }}
+    />
+  );
 }

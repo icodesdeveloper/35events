@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash, faCar } from "@fortawesome/free-solid-svg-icons";
+import { faTrash, faCar, faEnvelope, faEnvelopeCircleCheck } from "@fortawesome/free-solid-svg-icons";
 import { prisma } from "@/lib/prisma";
 import { formatPrice } from "@/lib/format";
 import { updatePaymentStatus, deleteRegistration } from "@/app/admin/(dashboard)/events/[id]/registrations/actions";
@@ -15,6 +16,8 @@ const STATUS_OPTIONS: { value: PaymentStatus; label: string }[] = [
   { value: "CONFIRMED", label: "Bevestigd" },
   { value: "CANCELLED", label: "Geannuleerd" },
 ];
+
+const dateFormatter = new Intl.DateTimeFormat("nl-BE", { day: "numeric", month: "short", year: "numeric" });
 
 export default async function EventRegistrationsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -37,8 +40,21 @@ export default async function EventRegistrationsPage({ params }: { params: Promi
 
   return (
     <div>
-      <h1 className="mb-1 text-xl font-semibold text-zinc-900 dark:text-white">{event.name}</h1>
-      <p className="mb-6 text-sm text-slate-500 dark:text-slate-400">Registraties</p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="mb-1 text-xl font-semibold text-zinc-900 dark:text-white">{event.name}</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Registraties</p>
+        </div>
+        {event.registrations.some((r) => r.paymentStatus === "PENDING_PAYMENT") ? (
+          <Link
+            href={`/admin/communications/new?preset=betalingsinfo&eventId=${event.id}`}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-slate-50 dark:border-zinc-700 dark:text-slate-300 dark:hover:bg-zinc-800"
+          >
+            <FontAwesomeIcon icon={faEnvelope} className="h-3.5 w-3.5" />
+            Betalingsinfo mailen naar niet-betaalden
+          </Link>
+        ) : null}
+      </div>
 
       <ManualRegistrationForm eventId={event.id} participants={eligibleParticipants} maxPassengers={event.maxPassengers} />
 
@@ -103,6 +119,19 @@ export default async function EventRegistrationsPage({ params }: { params: Promi
                       </>
                     ) : null}
                   </div>
+                  {expected > 0 ? (
+                    registration.paymentInfoSentAt ? (
+                      <div className="mt-1 flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400">
+                        <FontAwesomeIcon icon={faEnvelopeCircleCheck} className="h-3.5 w-3.5" />
+                        Betalingsinfo gemaild op {dateFormatter.format(registration.paymentInfoSentAt)}
+                      </div>
+                    ) : (
+                      <div className="mt-1 flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+                        <FontAwesomeIcon icon={faEnvelope} className="h-3.5 w-3.5" />
+                        Nog geen betalingsinfo gemaild
+                      </div>
+                    )
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-2">
                   {STATUS_OPTIONS.map((option) => (

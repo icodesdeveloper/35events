@@ -88,6 +88,40 @@ export const PAYMENT_BALANCE_LABEL: Record<PaymentBalanceStatus, string> = {
   OVERPAID: "Te veel betaald",
 };
 
+export type OutstandingPayment = {
+  registrationId: string;
+  eventName: string;
+  paymentReference: string;
+  amountDue: number;
+};
+
+// What a participant still has to transfer — drives the payment banner on
+// the account pages and the event page (components/public/PaymentDueBanner.tsx).
+// Only registrations still awaiting payment count: one the admin confirmed by
+// hand owes nothing, even without a Payment row behind it.
+export async function getOutstandingPayments(participantId: string, eventId?: string): Promise<OutstandingPayment[]> {
+  const registrations = await prisma.registration.findMany({
+    where: { participantId, paymentStatus: "PENDING_PAYMENT", paymentReference: { not: null }, eventId },
+    include: { event: { select: { name: true } }, payments: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const outstanding: OutstandingPayment[] = [];
+  for (const registration of registrations) {
+    const expected = getExpectedAmount(registration);
+    const received = registration.payments.reduce((sum, payment) => sum + Number(payment.amount.toString()), 0);
+    const balance = getPaymentBalance(received, expected);
+    if (balance !== "UNPAID" && balance !== "PARTIAL") continue;
+    outstanding.push({
+      registrationId: registration.id,
+      eventName: registration.event.name,
+      paymentReference: registration.paymentReference ?? "",
+      amountDue: (Math.round(expected * 100) - Math.round(received * 100)) / 100,
+    });
+  }
+  return outstanding;
+}
+
 // Shared by the admin dashboard stat cards and /admin/payments — cancelled
 // registrations are excluded since there's nothing left to collect on them.
 export async function getRegistrationPaymentOverview() {

@@ -331,6 +331,11 @@ model Registration {
   // incoming payment can be matched back to this registration — see
   // lib/payments.ts and app/admin/(dashboard)/payments/actions.ts.
   paymentReference        String?   @unique
+  // Last time a mail carrying the payment details (code + amount) went out
+  // to this participant: the registration confirmation, or a communication
+  // that uses the {{betaalcode}} variable (see lib/campaignVariables.ts).
+  // Null means no such mail was recorded — shown per registration in admin.
+  paymentInfoSentAt       DateTime?
   // Set when the extra-info "please fill this in" mail goes out (on publish)
   // and cleared/reset on every republish so a new reminder cycle can run
   // against the new deadline.

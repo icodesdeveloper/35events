@@ -2,14 +2,15 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition, type MouseEvent } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChevronDown, faChevronUp, faFileLines } from "@fortawesome/free-solid-svg-icons";
+import { faBolt, faChevronDown, faChevronLeft, faChevronUp, faFileLines } from "@fortawesome/free-solid-svg-icons";
 import RichTextEditor, { type RichTextEditorHandle } from "@/components/admin/RichTextEditor";
 import DatePickerField from "@/components/admin/DatePickerField";
 import Checkbox from "@/components/admin/Checkbox";
 import MultiCombobox from "@/components/admin/MultiCombobox";
 import { useConfirm } from "@/components/admin/ConfirmDialogProvider";
 import { formatEventDate } from "@/lib/format";
-import { CAMPAIGN_TEMPLATES } from "@/lib/mail/campaignTemplates";
+import { CAMPAIGN_PRESETS, CAMPAIGN_TEMPLATES } from "@/lib/mail/campaignTemplates";
+import { CAMPAIGN_VARIABLES, variableCode } from "@/lib/campaignVariables";
 import {
   saveCampaign,
   unscheduleCampaign,
@@ -52,14 +53,22 @@ const dateTimeFormatter = new Intl.DateTimeFormat("nl-BE", {
   minute: "2-digit",
 });
 
+// Lets another page open the composer with a preset already applied, e.g. the
+// "Betalingsinfo mailen" link on an event's registrations page.
+export type CampaignPrefill = { presetId: string; eventId: string };
+
 export default function CommunicationComposer({
   campaign,
   events,
   participants,
+  bankAccount,
+  prefill,
 }: {
   campaign: CampaignData | null;
   events: { id: string; name: string; date: Date }[];
   participants: { id: string; username: string; email: string }[];
+  bankAccount: { iban: string | null; accountName: string | null };
+  prefill?: CampaignPrefill | null;
 }) {
   const confirm = useConfirm();
   const boundAction = saveCampaign.bind(null, campaign?.id ?? null);
@@ -67,13 +76,21 @@ export default function CommunicationComposer({
   const errors = state.fieldErrors ?? {};
 
   const readOnly = campaign?.status === "SENT";
-  const [audienceMode, setAudienceMode] = useState<AudienceMode>(campaign?.audienceMode ?? "ALL_PARTICIPANTS");
-  const [selectedEventIds, setSelectedEventIds] = useState<string[]>(campaign?.eventIds ?? []);
+  const initialPreset =
+    !campaign && prefill ? (CAMPAIGN_PRESETS.find((preset) => preset.id === prefill.presetId) ?? null) : null;
+  const [audienceMode, setAudienceMode] = useState<AudienceMode>(
+    campaign?.audienceMode ?? (initialPreset ? "EVENTS" : "ALL_PARTICIPANTS"),
+  );
+  const [selectedEventIds, setSelectedEventIds] = useState<string[]>(
+    campaign?.eventIds ?? (initialPreset && prefill ? [prefill.eventId] : []),
+  );
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(
-    campaign?.statuses ?? STATUS_OPTIONS.map((s) => s.value),
+    campaign?.statuses ?? initialPreset?.statuses ?? STATUS_OPTIONS.map((s) => s.value),
   );
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<string[]>(campaign?.participantIds ?? []);
-  const [subject, setSubject] = useState(campaign?.subject ?? "");
+  const [subject, setSubject] = useState(campaign?.subject ?? initialPreset?.subject ?? "");
+  const [presetPickerOpen, setPresetPickerOpen] = useState(false);
+  const [pendingPresetId, setPendingPresetId] = useState<string | null>(null);
   const [scheduledDate, setScheduledDate] = useState(campaign?.scheduledAt?.slice(0, 10) ?? "");
   const [scheduledTime, setScheduledTime] = useState(
     campaign?.scheduledAt ? campaign.scheduledAt.slice(11, 16) : "10:00",
@@ -111,6 +128,20 @@ export default function CommunicationComposer({
     setSubject(template.subject);
     richTextRef.current?.setContent(template.bodyHtml);
     setShowTemplatePicker(false);
+  }
+
+  // A preset sets audience, subject and text in one go; all of it stays
+  // editable afterwards.
+  function applyPreset(presetId: string, eventId: string) {
+    const preset = CAMPAIGN_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    setAudienceMode("EVENTS");
+    setSelectedEventIds([eventId]);
+    setSelectedStatuses(preset.statuses);
+    setSubject(preset.subject);
+    richTextRef.current?.setContent(preset.buildBodyHtml(bankAccount));
+    setPresetPickerOpen(false);
+    setPendingPresetId(null);
   }
 
   async function handleSendClick(event: MouseEvent<HTMLButtonElement>) {
@@ -153,6 +184,9 @@ export default function CommunicationComposer({
 
   const busy = pending || unschedulePending;
   const participantOptions = participants.map((p) => ({ value: p.id, label: `${p.username} (${p.email})` }));
+  // Event variables ({{betaalcode}}, {{bedrag}}, ...) describe one
+  // registration, so they need an audience of exactly one event.
+  const singleEvent = audienceMode === "EVENTS" && selectedEventIds.length === 1;
 
   return (
     <form action={formAction} className="max-w-3xl space-y-8">
@@ -232,6 +266,82 @@ export default function CommunicationComposer({
         <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
           {state.notice}
         </p>
+      ) : null}
+
+      {!readOnly ? (
+        <section className="rounded-lg border border-slate-200 p-4 dark:border-zinc-800">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">Snel starten</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Een preset vult doelgroep, onderwerp en tekst in. Je kan daarna alles nog aanpassen.
+              </p>
+            </div>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setPresetPickerOpen((v) => !v);
+                  setPendingPresetId(null);
+                }}
+                className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-slate-200"
+              >
+                <FontAwesomeIcon icon={faBolt} className="h-3.5 w-3.5" />
+                Kies een preset
+              </button>
+              {presetPickerOpen ? (
+                <div className="absolute right-0 z-10 mt-1 w-80 rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                  {pendingPresetId === null ? (
+                    CAMPAIGN_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => setPendingPresetId(preset.id)}
+                        className="block w-full rounded-md px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-zinc-800"
+                      >
+                        <span className="block text-sm font-medium text-zinc-900 dark:text-white">{preset.name}</span>
+                        <span className="block text-xs text-slate-500 dark:text-slate-400">{preset.description}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setPendingPresetId(null)}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-500 hover:text-zinc-900 dark:text-slate-400 dark:hover:text-white"
+                      >
+                        <FontAwesomeIcon icon={faChevronLeft} className="h-3 w-3" />
+                        Voor welk event?
+                      </button>
+                      <div className="max-h-64 overflow-y-auto">
+                        {events.map((event) => (
+                          <button
+                            key={event.id}
+                            type="button"
+                            onClick={() => applyPreset(pendingPresetId, event.id)}
+                            className="block w-full rounded-md px-3 py-2 text-left text-sm text-zinc-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-zinc-800"
+                          >
+                            {event.name}{" "}
+                            <span className="text-slate-400 dark:text-slate-500">— {formatEventDate(event.date)}</span>
+                          </button>
+                        ))}
+                        {events.length === 0 ? (
+                          <p className="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">Geen events.</p>
+                        ) : null}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          {!bankAccount.iban ? (
+            <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">
+              Er is nog geen rekeningnummer ingesteld bij Instellingen. Zonder kan een mail met{" "}
+              <span className="font-mono">{variableCode("rekeningnummer")}</span> niet verzonden worden.
+            </p>
+          ) : null}
+        </section>
       ) : null}
 
       <section>
@@ -401,9 +511,42 @@ export default function CommunicationComposer({
         <RichTextEditor
           ref={richTextRef}
           name="bodyHtml"
-          defaultValue={campaign?.bodyHtml}
+          defaultValue={campaign?.bodyHtml ?? initialPreset?.buildBodyHtml(bankAccount)}
           placeholder="Schrijf je bericht..."
         />
+
+        {!readOnly ? (
+          <div className="mt-3">
+            <div className="mb-1.5 text-sm font-medium text-zinc-700 dark:text-slate-300">Variabele invoegen</div>
+            <div className="flex flex-wrap gap-1.5">
+              {CAMPAIGN_VARIABLES.map((variable) => {
+                const available = variable.scope === "always" || singleEvent;
+                return (
+                  <button
+                    key={variable.key}
+                    type="button"
+                    disabled={!available}
+                    title={
+                      available ? `Voegt ${variableCode(variable.key)} in` : "Alleen beschikbaar bij precies één event"
+                    }
+                    onClick={() => richTextRef.current?.insertText(variableCode(variable.key))}
+                    className="rounded-full border border-slate-200 px-2.5 py-1 text-xs font-medium text-zinc-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:text-slate-300 dark:hover:bg-zinc-800"
+                  >
+                    {variable.label}{" "}
+                    <span className="font-mono text-slate-400 dark:text-slate-500">{variableCode(variable.key)}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              Klik om in de tekst in te voegen, of typ de code zelf — dat werkt ook in het onderwerp. Elke ontvanger
+              krijgt zijn eigen waarde.
+              {singleEvent
+                ? ""
+                : " Variabelen over het event en de betaling werken alleen als de doelgroep precies één event is."}
+            </p>
+          </div>
+        ) : null}
       </section>
 
       {!readOnly ? (

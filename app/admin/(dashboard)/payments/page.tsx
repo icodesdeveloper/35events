@@ -23,6 +23,7 @@ export default async function PaymentsPage({
     balance,
     paymentStatus: registration.paymentStatus as PaymentRow["paymentStatus"],
     createdAt: registration.createdAt,
+    paymentInfoSentAt: registration.paymentInfoSentAt,
   }));
 
   const initialFilter =

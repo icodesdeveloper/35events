@@ -17,6 +17,7 @@ export type PaymentRow = {
   balance: PaymentBalanceStatus;
   paymentStatus: PaymentStatus;
   createdAt: Date;
+  paymentInfoSentAt: Date | null;
 };
 
 type FilterKey = "all" | PaymentBalanceStatus;
@@ -116,6 +117,7 @@ export default function PaymentsTable({ rows, initialFilter }: { rows: PaymentRo
                 </th>
               ))}
               <th className="px-5 py-3 font-medium">Code</th>
+              <th className="px-5 py-3 font-medium">Betalingsinfo gemaild</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
@@ -149,11 +151,14 @@ export default function PaymentsTable({ rows, initialFilter }: { rows: PaymentRo
                 <td className="px-5 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">
                   {row.paymentReference}
                 </td>
+                <td className="px-5 py-3 whitespace-nowrap text-slate-500 dark:text-slate-400">
+                  {row.paymentInfoSentAt ? dateFormatter.format(row.paymentInfoSentAt) : "Nog niet"}
+                </td>
               </tr>
             ))}
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={columns.length + 1} className="px-5 py-8 text-center text-slate-500 dark:text-slate-400">
+                <td colSpan={columns.length + 2} className="px-5 py-8 text-center text-slate-500 dark:text-slate-400">
                   Geen registraties in deze weergave.
                 </td>
               </tr>

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth as participantAuth } from "@/lib/auth/participant";
 import ExtraInfoForm, { type ExtraInfoQuestionField } from "@/components/forms/ExtraInfoForm";
+import PaymentDueBanner from "@/components/public/PaymentDueBanner";
 import { getExtraInfoAvailability, EXTRA_INFO_CLOSED_MESSAGE, passengerLabel } from "@/lib/questionForms";
 
 export default async function ExtraInfoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -31,6 +32,7 @@ export default async function ExtraInfoPage({ params }: { params: Promise<{ id: 
   if (!availability.open) {
     return (
       <div className="mx-auto max-w-xl px-4 py-16 md:px-8">
+        <PaymentDueBanner participantId={session.user.participantId} className="mb-8" />
         <h1 className="mb-1 text-2xl font-semibold text-zinc-900 dark:text-white">Bijkomende informatie</h1>
         <p className="mb-6 text-slate-600 dark:text-slate-300">{registration.event.name}</p>
 
@@ -69,6 +71,7 @@ export default async function ExtraInfoPage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="mx-auto max-w-xl px-4 py-16 md:px-8">
+      <PaymentDueBanner participantId={session.user.participantId} className="mb-8" />
       <h1 className="mb-1 text-2xl font-semibold text-zinc-900 dark:text-white">Bijkomende informatie</h1>
       <p className="mb-8 text-slate-600 dark:text-slate-300">{registration.event.name}</p>
       <ExtraInfoForm
